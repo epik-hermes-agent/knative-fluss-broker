@@ -1,0 +1,112 @@
+[versions]
+# Core
+kotlin = "1.9.25"
+java = "21"
+spring-boot = "3.3.5"
+spring-dependency-management = "1.1.6"
+
+# Event system
+fluss = "0.9.0-incubating"
+flink = "1.20.0"
+iceberg = "1.4.3"
+cloudevents = "2.5.0"
+
+# Kubernetes
+fabric8 = "6.13.4"
+
+# Storage
+hive-metastore = "3.1.3"
+minio = "8.5.14"
+aws-sdk = "2.25.16"
+
+# HTTP
+okhttp = "4.12.0"
+jackson = "2.17.2"
+
+# Observability
+micrometer = "1.12.0"
+prometheus = "1.3.1"
+
+# Testing
+junit = "5.10.3"
+assertj = "3.26.3"
+mockito = "5.14.2"
+testcontainers = "1.20.3"
+wiremock = "3.9.1"
+
+# Misc
+slf4j = "2.0.16"
+logback = "1.5.12"
+guava = "33.3.1-jre"
+netty = "4.1.114.Final"
+protobuf = "3.25.5"
+
+[libraries]
+# Spring Boot
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-starter-json = { module = "org.springframework.boot:spring-boot-starter-json" }
+
+# Fluss
+fluss-client = { module = "org.apache.fluss:fluss-client", version.ref = "fluss" }
+fluss-common = { module = "org.apache.fluss:fluss-common", version.ref = "fluss" }
+fluss-lakehouse = { module = "org.apache.fluss:fluss-lakehouse-paimon", version.ref = "fluss" }
+
+# Iceberg
+iceberg-core = { module = "org.apache.iceberg:iceberg-core", version.ref = "iceberg" }
+iceberg-hive = { module = "org.apache.iceberg:iceberg-hive-metastore", version.ref = "iceberg" }
+iceberg-aws = { module = "org.apache.iceberg:iceberg-aws", version.ref = "iceberg" }
+
+# CloudEvents
+cloudevents-api = { module = "io.cloudevents:cloudevents-api", version.ref = "cloudevents" }
+cloudevents-json-jackson = { module = "io.cloudevents:cloudevents-json-jackson", version.ref = "cloudevents" }
+cloudevents-http-basic = { module = "io.cloudevents:cloudevents-http-basic", version.ref = "cloudevents" }
+
+# Kubernetes
+fabric8-kubernetes-client = { module = "io.fabric8:kubernetes-client", version.ref = "fabric8" }
+fabric8-kubernetes-client-api = { module = "io.fabric8:kubernetes-client-api", version.ref = "fabric8" }
+fabric8-kubernetes-model-core = { module = "io.fabric8:kubernetes-model-core", version.ref = "fabric8" }
+fabric8-crd-generator-apt = { module = "io.fabric8:crd-generator-apt", version.ref = "fabric8" }
+
+# HTTP
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
+
+# Jackson
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jackson" }
+jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
+
+# Observability
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+prometheus-metrics = { module = "io.prometheus:prometheus-metrics-core", version.ref = "prometheus" }
+
+# Testing
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
+testcontainers-minio = { module = "org.testcontainers:minio", version.ref = "testcontainers" }
+wiremock = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
+
+# Misc
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+[bundles]
+cloudevents = ["cloudevents-api", "cloudevents-json-jackson", "cloudevents-http-basic"]
+testing-core = ["junit-jupiter-api", "junit-jupiter-params", "assertj-core"]
+testing-containers = ["testcontainers-junit-jupiter"]
+jackson = ["jackson-databind", "jackson-annotations", "jackson-datatype-jsr310"]
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+java-library = { id = "java-library" }

@@ -1,0 +1,114 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: brokers.eventing.fluss.io
+spec:
+  group: eventing.fluss.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                config:
+                  type: object
+                  properties:
+                    fluss:
+                      type: object
+                      properties:
+                        cluster:
+                          type: object
+                          properties:
+                            endpoint:
+                              type: string
+                              default: "fluss://fluss-cluster:9123"
+                    ingress:
+                      type: object
+                      properties:
+                        replicas:
+                          type: integer
+                          default: 1
+                        resources:
+                          type: object
+                          properties:
+                            requests:
+                              type: object
+                              properties:
+                                cpu:
+                                  type: string
+                                  default: "100m"
+                                memory:
+                                  type: string
+                                  default: "256Mi"
+                    schema:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        auto-register:
+                          type: boolean
+                          default: true
+                    iceberg:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        catalog-type:
+                          type: string
+                          default: "hive"
+                        warehouse:
+                          type: string
+                          default: "s3a://iceberg-warehouse/"
+                        hive-endpoint:
+                          type: string
+                          default: "thrift://hive-metastore:9083"
+            status:
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                addresses:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      url:
+                        type: string
+                observedGeneration:
+                  type: integer
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].status
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: brokers
+    singular: broker
+    kind: Broker
+    shortNames:
+      - fb

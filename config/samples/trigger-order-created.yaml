@@ -1,0 +1,18 @@
+apiVersion: eventing.fluss.io/v1alpha1
+kind: Trigger
+metadata:
+  name: order-created
+  namespace: default
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: "com.example.order.created"
+  subscriber:
+    uri: "http://order-processor.default.svc.cluster.local/events"
+    delivery:
+      retry: 5
+      backoffPolicy: "exponential"
+      backoffDelay: "PT1S"
+      deadLetterSink:
+        uri: "http://dlq-handler.default.svc.cluster.local"

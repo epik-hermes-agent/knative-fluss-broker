@@ -1,0 +1,19 @@
+# Build stage
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /app
+COPY gradle/ gradle/
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+COPY gradle/libs.versions.toml gradle/libs.versions.toml
+RUN ./gradlew dependencies --no-daemon || true
+COPY . .
+RUN ./gradlew :data-plane:ingress:build :data-plane:dispatcher:build -x test --no-daemon
+
+# Runtime stage
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+RUN groupadd -r broker && useradd -r -g broker broker
+COPY --from=builder /app/data-plane/ingress/build/libs/*.jar /app/ingress.jar
+COPY --from=builder /app/data-plane/dispatcher/build/libs/*.jar /app/dispatcher.jar
+USER broker
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/ingress.jar"]

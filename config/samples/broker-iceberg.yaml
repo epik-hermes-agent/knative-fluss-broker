@@ -1,0 +1,20 @@
+apiVersion: eventing.fluss.io/v1alpha1
+kind: Broker
+metadata:
+  name: iceberg-broker
+  namespace: default
+spec:
+  config:
+    fluss:
+      cluster:
+        endpoint: "fluss://fluss-cluster:9123"
+    ingress:
+      replicas: 1
+    schema:
+      enabled: true
+      auto-register: true
+    iceberg:
+      enabled: true
+      catalog-type: "hive"
+      warehouse: "s3a://iceberg-warehouse/"
+      hive-endpoint: "thrift://hive-metastore:9083"

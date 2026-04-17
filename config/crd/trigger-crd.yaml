@@ -1,0 +1,94 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: triggers.eventing.fluss.io
+spec:
+  group: eventing.fluss.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: ["broker", "subscriber"]
+              properties:
+                broker:
+                  type: string
+                  description: "Name of the Broker this Trigger belongs to"
+                filter:
+                  type: object
+                  properties:
+                    attributes:
+                      type: object
+                      additionalProperties:
+                        type: string
+                      description: "CloudEvent attribute filters (exact match or prefix wildcard)"
+                subscriber:
+                  type: object
+                  required: ["uri"]
+                  properties:
+                    uri:
+                      type: string
+                      description: "Subscriber HTTP endpoint URI"
+                    delivery:
+                      type: object
+                      properties:
+                        retry:
+                          type: integer
+                          default: 5
+                        backoffPolicy:
+                          type: string
+                          default: "exponential"
+                          enum: ["exponential", "linear"]
+                        backoffDelay:
+                          type: string
+                          default: "PT1S"
+                        deadLetterSink:
+                          type: object
+                          properties:
+                            uri:
+                              type: string
+            status:
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                observedGeneration:
+                  type: integer
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Broker
+          type: string
+          jsonPath: .spec.broker
+        - name: Subscriber
+          type: string
+          jsonPath: .spec.subscriber.uri
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].status
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: triggers
+    singular: trigger
+    kind: Trigger
+    shortNames:
+      - ft
