@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fluss Knative Broker — High-Level Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #e2e8f0; display: flex; justify-content: center; padding: 40px 20px; }
+  .container { max-width: 1100px; width: 100%; }
+  h1 { font-size: 26px; font-weight: 700; color: #f1f5f9; text-align: center; margin-bottom: 4px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+  svg { width: 100%; height: auto; }
+  .box { rx: 10; ry: 10; stroke-width: 1.5; }
+  .label { font-family: 'Segoe UI', system-ui, sans-serif; font-weight: 600; text-anchor: middle; }
+  .label-sm { font-family: 'Segoe UI', system-ui, sans-serif; font-weight: 400; text-anchor: middle; fill: #94a3b8; font-size: 11px; }
+  .arrow { stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-dashed { stroke-width: 1.5; fill: none; stroke-dasharray: 6 4; marker-end: url(#arrowhead-dim); }
+  .tag { rx: 4; ry: 4; }
+  .tag-text { font-family: 'JetBrains Mono', monospace, sans-serif; font-size: 10px; fill: #fff; text-anchor: middle; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Fluss Knative Broker</h1>
+<p class="subtitle">Durable event storage for Knative Eventing — powered by Apache Fluss</p>
+
+<svg viewBox="0 0 1060 620" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+    <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrowhead-dim" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <linearGradient id="fluss-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d3d3d"/>
+      <stop offset="100%" stop-color="#0a2e2e"/>
+    </linearGradient>
+    <linearGradient id="cold-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2d1b4e"/>
+      <stop offset="100%" stop-color="#1e1233"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ═══════════ PRODUCERS ═══════════ -->
+  <g transform="translate(40, 60)">
+    <rect class="box" x="0" y="0" width="130" height="90" fill="#1e293b" stroke="#334155"/>
+    <text class="label" x="65" y="30" fill="#e2e8f0" font-size="13">Producers</text>
+    <text class="label-sm" x="65" y="50">Microservices</text>
+    <text class="label-sm" x="65" y="65">SaaS Webhooks</text>
+    <text class="label-sm" x="65" y="80">IoT / Edge</text>
+  </g>
+
+  <!-- ═══════════ INGRESS ═══════════ -->
+  <g transform="translate(230, 50)">
+    <rect class="box" x="0" y="0" width="160" height="110" fill="#1e293b" stroke="#22d3ee" stroke-opacity="0.5"/>
+    <rect class="tag" x="50" y="-10" width="60" height="20" fill="#0891b2"/>
+    <text class="tag-text" x="80" y="4">DATA PLANE</text>
+    <text class="label" x="80" y="32" fill="#22d3ee" font-size="14">Ingress</text>
+    <text class="label-sm" x="80" y="52">Validate CloudEvent</text>
+    <text class="label-sm" x="80" y="67">Resolve schema</text>
+    <text class="label-sm" x="80" y="82">Write envelope → Fluss</text>
+    <text class="label-sm" x="80" y="97" fill="#22d3ee">HTTP POST → 202</text>
+  </g>
+
+  <!-- Arrow: Producer → Ingress -->
+  <line class="arrow" x1="170" y1="105" x2="225" y2="105" stroke="#64748b"/>
+
+  <!-- ═══════════ FLUSS BROKER (central) ═══════════ -->
+  <g transform="translate(230, 210)">
+    <rect class="box" x="0" y="0" width="500" height="180" fill="url(#fluss-grad)" stroke="#14b8a6" stroke-opacity="0.6"/>
+    <rect class="tag" x="190" y="-10" width="120" height="20" fill="#0d9488"/>
+    <text class="tag-text" x="250" y="4">FLUSS CLUSTER</text>
+
+    <!-- Coordinator -->
+    <rect x="20" y="25" width="120" height="55" rx="6" fill="#0f4c4c" stroke="#14b8a6" stroke-opacity="0.3"/>
+    <text class="label" x="80" y="47" fill="#5eead4" font-size="12">Coordinator</text>
+    <text class="label-sm" x="80" y="63">metadata, allocation</text>
+
+    <!-- Tablet Servers -->
+    <rect x="170" y="25" width="310" height="55" rx="6" fill="#0f4c4c" stroke="#14b8a6" stroke-opacity="0.3"/>
+    <text class="label" x="325" y="47" fill="#5eead4" font-size="12">Tablet Servers (N)</text>
+    <text class="label-sm" x="260" y="63">LogStore</text>
+    <text class="label-sm" x="325" y="63">·</text>
+    <text class="label-sm" x="390" y="63">KvStore</text>
+
+    <!-- Log Table representation -->
+    <rect x="20" y="100" width="460" height="60" rx="6" fill="#0a3333" stroke="#14b8a6" stroke-opacity="0.2"/>
+    <text class="label" x="250" y="122" fill="#99f6e4" font-size="13">Log Table: broker_{name}</text>
+    <text class="label-sm" x="120" y="142">Arrow IPC · RocksDB</text>
+    <text class="label-sm" x="250" y="142">·</text>
+    <text class="label-sm" x="350" y="142">Replicated · Buckets 1..N</text>
+  </g>
+
+  <!-- Arrow: Ingress → Fluss -->
+  <line class="arrow" x1="310" y1="160" x2="310" y2="205" stroke="#22d3ee"/>
+
+  <!-- ═══════════ TRIGGERS + DISPATCHERS ═══════════ -->
+  <g transform="translate(230, 440)">
+    <!-- Trigger A -->
+    <rect class="box" x="0" y="0" width="230" height="80" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.5"/>
+    <rect class="tag" x="70" y="-10" width="90" height="20" fill="#b45309"/>
+    <text class="tag-text" x="115" y="4">TRIGGER A</text>
+    <text class="label" x="115" y="25" fill="#fbbf24" font-size="13">Dispatcher</text>
+    <text class="label-sm" x="115" y="44">filter: type=order.*</text>
+    <text class="label-sm" x="115" y="59">credits: 100 · 3 lanes</text>
+    <text class="label-sm" x="115" y="72" fill="#fbbf24">at-least-once delivery</text>
+
+    <!-- Trigger B -->
+    <rect class="box" x="270" y="0" width="230" height="80" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.5"/>
+    <rect class="tag" x="340" y="-10" width="90" height="20" fill="#b45309"/>
+    <text class="tag-text" x="385" y="4">TRIGGER B</text>
+    <text class="label" x="385" y="25" fill="#fbbf24" font-size="13">Dispatcher</text>
+    <text class="label-sm" x="385" y="44">filter: type=payment.*</text>
+    <text class="label-sm" x="385" y="59">credits: 100 · 2 lanes</text>
+    <text class="label-sm" x="385" y="72" fill="#fbbf24">at-least-once delivery</text>
+  </g>
+
+  <!-- Arrows: Fluss → Dispatchers -->
+  <line class="arrow" x1="350" y1="390" x2="350" y2="435" stroke="#f59e0b" stroke-opacity="0.6"/>
+  <path class="arrow" d="M 400 390 Q 530 410 620 440" stroke="#f59e0b" stroke-opacity="0.6"/>
+
+  <!-- ═══════════ SUBSCRIBERS ═══════════ -->
+  <g transform="translate(40, 560)">
+    <rect class="box" x="0" y="0" width="160" height="50" fill="#1e293b" stroke="#a78bfa" stroke-opacity="0.5"/>
+    <text class="label" x="80" y="20" fill="#c4b5fd" font-size="12">Subscriber A</text>
+    <text class="label-sm" x="80" y="38">order-service</text>
+  </g>
+  <g transform="translate(260, 560)">
+    <rect class="box" x="0" y="0" width="160" height="50" fill="#1e293b" stroke="#a78bfa" stroke-opacity="0.5"/>
+    <text class="label" x="80" y="20" fill="#c4b5fd" font-size="12">Subscriber B</text>
+    <text class="label-sm" x="80" y="38">payment-service</text>
+  </g>
+
+  <!-- Arrows: Dispatchers → Subscribers -->
+  <line class="arrow" x1="115" y1="520" x2="115" y2="555" stroke="#a78bfa" stroke-opacity="0.6"/>
+  <line class="arrow" x1="385" y1="520" x2="385" y2="555" stroke="#a78bfa" stroke-opacity="0.6"/>
+
+  <!-- ═══════════ DLQ ═══════════ -->
+  <g transform="translate(520, 545)">
+    <rect class="box" x="0" y="0" width="140" height="65" fill="#1c1520" stroke="#ef4444" stroke-opacity="0.4"/>
+    <text class="label" x="70" y="22" fill="#fca5a5" font-size="12">Dead Letter Queue</text>
+    <text class="label-sm" x="70" y="40">Fluss table: dlq_{trigger}</text>
+    <text class="label-sm" x="70" y="55">retries exhausted</text>
+  </g>
+
+  <!-- Arrow: Dispatcher → DLQ -->
+  <path class="arrow-dashed" d="M 500 520 Q 560 530 590 550" stroke="#ef4444" stroke-opacity="0.5"/>
+
+  <!-- ═══════════ ICEBERG TIERING (optional) ═══════════ -->
+  <g transform="translate(790, 100)">
+    <rect class="box" x="0" y="0" width="230" height="240" fill="url(#cold-grad)" stroke="#8b5cf6" stroke-opacity="0.4" stroke-dasharray="6 4"/>
+    <rect class="tag" x="55" y="-10" width="120" height="20" fill="#6d28d9"/>
+    <text class="tag-text" x="115" y="4">OPTIONAL · COLD TIER</text>
+
+    <text class="label" x="115" y="35" fill="#c4b5fd" font-size="14">Iceberg Lakehouse</text>
+
+    <!-- Tiering job -->
+    <rect x="15" y="55" width="200" height="50" rx="6" fill="#2d1b4e" stroke="#8b5cf6" stroke-opacity="0.2"/>
+    <text class="label" x="115" y="75" fill="#a78bfa" font-size="12">Fluss Tiering Job</text>
+    <text class="label-sm" x="115" y="92">built-in · no custom code</text>
+
+    <!-- Iceberg tables -->
+    <rect x="15" y="120" width="200" height="50" rx="6" fill="#2d1b4e" stroke="#8b5cf6" stroke-opacity="0.2"/>
+    <text class="label" x="115" y="140" fill="#a78bfa" font-size="12">Iceberg Tables</text>
+    <text class="label-sm" x="115" y="157">Parquet · ACID · time travel</text>
+
+    <!-- Query engines -->
+    <rect x="15" y="185" width="200" height="40" rx="6" fill="#2d1b4e" stroke="#8b5cf6" stroke-opacity="0.2"/>
+    <text class="label-sm" x="115" y="205">Flink · Spark · Trino</text>
+
+    <!-- JDBC Catalog -->
+    <rect x="55" y="230" width="120" height="0" rx="0" fill="none"/>
+  </g>
+
+  <!-- Arrow: Fluss → Iceberg tiering -->
+  <path class="arrow-dashed" d="M 730 290 Q 770 250 785 220" stroke="#8b5cf6" stroke-opacity="0.4"/>
+
+  <!-- ═══════════ CONTROL PLANE ═══════════ -->
+  <g transform="translate(790, 390)">
+    <rect class="box" x="0" y="0" width="230" height="130" fill="#172033" stroke="#3b82f6" stroke-opacity="0.4"/>
+    <rect class="tag" x="65" y="-10" width="100" height="20" fill="#1d4ed8"/>
+    <text class="tag-text" x="115" y="4">CONTROL PLANE</text>
+
+    <text class="label" x="115" y="30" fill="#93c5fd" font-size="14">Kubernetes Controller</text>
+
+    <rect x="15" y="50" width="95" height="30" rx="4" fill="#1e3a5f" stroke="#3b82f6" stroke-opacity="0.2"/>
+    <text class="label-sm" x="62" y="70" fill="#93c5fd">Broker CRD</text>
+
+    <rect x="120" y="50" width="95" height="30" rx="4" fill="#1e3a5f" stroke="#3b82f6" stroke-opacity="0.2"/>
+    <text class="label-sm" x="167" y="70" fill="#93c5fd">Trigger CRD</text>
+
+    <text class="label-sm" x="115" y="105">Watches CRDs → reconciles infra</text>
+    <text class="label-sm" x="115" y="120">Creates Fluss DBs, tables, scanners</text>
+  </g>
+
+  <!-- Bidirectional: Control Plane ↔ Fluss -->
+  <path class="arrow" d="M 790 430 Q 750 400 730 350" stroke="#3b82f6" stroke-opacity="0.3"/>
+  <path d="M 730 355 Q 748 395 788 428" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ═══════════ LEGEND ═══════════ -->
+  <g transform="translate(40, 15)">
+    <rect x="0" y="0" width="10" height="10" rx="2" fill="#22d3ee"/>
+    <text x="16" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Data Plane</text>
+
+    <rect x="100" y="0" width="10" height="10" rx="2" fill="#14b8a6"/>
+    <text x="116" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Fluss Storage</text>
+
+    <rect x="210" y="0" width="10" height="10" rx="2" fill="#f59e0b"/>
+    <text x="226" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Trigger / Dispatch</text>
+
+    <rect x="350" y="0" width="10" height="10" rx="2" fill="#3b82f6"/>
+    <text x="366" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Control Plane</text>
+
+    <rect x="460" y="0" width="10" height="10" rx="2" fill="#8b5cf6"/>
+    <text x="476" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Iceberg (optional)</text>
+
+    <line x1="570" y1="5" x2="585" y2="5" stroke="#64748b" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="591" y="10" fill="#94a3b8" font-size="10" font-family="sans-serif">Optional path</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="530" y="615" fill="#475569" font-size="11" text-anchor="middle" font-family="sans-serif">Knative Fluss Broker · Apache Fluss 0.9.0 · Knative Eventing · Apache 2.0</text>
+</svg>
+</div>
+</body>
+</html>
