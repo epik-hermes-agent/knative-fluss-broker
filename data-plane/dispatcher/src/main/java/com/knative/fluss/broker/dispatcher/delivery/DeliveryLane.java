@@ -21,6 +21,13 @@ public class DeliveryLane {
 
     private static final Logger log = LoggerFactory.getLogger(DeliveryLane.class);
 
+    /** Poll timeout when waiting for events from the buffer. */
+    private static final long POLL_TIMEOUT_MS = 100;
+    /** Sleep interval when waiting for credits to become available. */
+    private static final long CREDIT_WAIT_MS = 50;
+    /** Sleep interval when draining inflight events during shutdown. */
+    private static final long DRAIN_POLL_MS = 100;
+
     private final int laneId;
     private final CreditBucket credits;
     private final SubscriberClient subscriberClient;
@@ -77,7 +84,7 @@ public class DeliveryLane {
             // Poll for event
             Envelope event;
             try {
-                event = buffer.poll(100, TimeUnit.MILLISECONDS);
+                event = buffer.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 credits.release();
@@ -143,7 +150,7 @@ public class DeliveryLane {
         // Spin-wait with short sleep until credits are available
         while (!credits.hasCredits() && status != LaneStatus.STOPPED) {
             try {
-                Thread.sleep(50);
+                Thread.sleep(CREDIT_WAIT_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -155,7 +162,7 @@ public class DeliveryLane {
     public void drain() {
         status = LaneStatus.DRAINING;
         while (!inflightEvents.isEmpty()) {
-            try { Thread.sleep(100); } catch (InterruptedException e) { break; }
+            try { Thread.sleep(DRAIN_POLL_MS); } catch (InterruptedException e) { break; }
         }
         status = LaneStatus.STOPPED;
     }

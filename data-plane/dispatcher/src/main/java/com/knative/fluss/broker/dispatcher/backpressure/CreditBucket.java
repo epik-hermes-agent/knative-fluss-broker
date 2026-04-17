@@ -83,7 +83,8 @@ public class CreditBucket {
         if (periods > 0) {
             int added = (int) periods * refillRate;
             availableCredits = Math.min(availableCredits + added, maxCredits);
-            lastRefill = now;
+            // Advance by exact periods to avoid drift (not to 'now')
+            lastRefill = lastRefill.plus(periods * refillInterval.toMillis(), java.time.temporal.ChronoUnit.MILLIS);
         }
     }
 }

@@ -34,6 +34,13 @@ public class FlussEventWriter implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(FlussEventWriter.class);
 
+    // DLQ table column indices (base envelope columns + 4 DLQ metadata columns)
+    private static final int DLQ_TOTAL_COLUMNS = 15;
+    private static final int DLQ_COL_REASON = 11;
+    private static final int DLQ_COL_ATTEMPTS = 12;
+    private static final int DLQ_COL_LAST_ERROR = 13;
+    private static final int DLQ_COL_TIMESTAMP = 14;
+
     private final FlussConnectionManager connectionManager;
     private final FlussConfig config;
     private final ExecutorService writeExecutor;
@@ -138,18 +145,18 @@ public class FlussEventWriter implements AutoCloseable {
                     // Build base row from envelope
                     GenericRow baseRow = EnvelopeRowMapper.toGenericRow(envelope);
                     // DLQ table has 15 columns (11 base + 4 DLQ metadata)
-                    GenericRow dlqRow = new GenericRow(15);
+                    GenericRow dlqRow = new GenericRow(DLQ_TOTAL_COLUMNS);
                     // Copy base columns
                     for (int i = 0; i < EnvelopeRowMapper.COLUMN_COUNT; i++) {
                         dlqRow.setField(i, baseRow.getField(i));
                     }
-                    // DLQ metadata columns (indices 11-14)
-                    dlqRow.setField(11, BinaryString.fromString(reason));
-                    dlqRow.setField(12, attempts);
-                    dlqRow.setField(13, lastError != null
+                    // DLQ metadata columns
+                    dlqRow.setField(DLQ_COL_REASON, BinaryString.fromString(reason));
+                    dlqRow.setField(DLQ_COL_ATTEMPTS, attempts);
+                    dlqRow.setField(DLQ_COL_LAST_ERROR, lastError != null
                             ? BinaryString.fromString(lastError)
                             : null);
-                    dlqRow.setField(14, TimestampLtz.fromEpochMillis(
+                    dlqRow.setField(DLQ_COL_TIMESTAMP, TimestampLtz.fromEpochMillis(
                             Instant.now().toEpochMilli()));
 
                     writer.append(dlqRow).get(config.ackTimeoutMs(), TimeUnit.MILLISECONDS);

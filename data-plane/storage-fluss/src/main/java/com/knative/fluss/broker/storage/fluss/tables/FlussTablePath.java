@@ -32,7 +32,7 @@ public record FlussTablePath(
     public static FlussTablePath dlqTable(String namespace, String brokerName, String triggerName) {
         return new FlussTablePath(
             "knative_" + sanitize(namespace),
-            "dlq_" + sanitize(triggerName)
+            "dlq_" + sanitize(brokerName) + "_" + sanitize(triggerName)
         );
     }
 

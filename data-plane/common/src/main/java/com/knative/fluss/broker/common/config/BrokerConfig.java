@@ -1,8 +1,5 @@
 package com.knative.fluss.broker.common.config;
 
-import java.time.Duration;
-import java.util.Map;
-
 /**
  * Top-level configuration for the Fluss broker.
  * Loaded from application.yaml or environment variables.

@@ -17,6 +17,8 @@ import java.util.Map;
  * @param s3Endpoint        S3-compatible endpoint (e.g., "http://localhost:9000")
  * @param s3AccessKey       S3 access key
  * @param s3SecretKey       S3 secret key
+ * @param jdbcUser          JDBC catalog username (used when catalogType is "jdbc")
+ * @param jdbcPassword      JDBC catalog password (used when catalogType is "jdbc")
  */
 public record IcebergConfig(
     boolean enabled,
@@ -26,24 +28,17 @@ public record IcebergConfig(
     String hiveMetastoreUri,
     String s3Endpoint,
     String s3AccessKey,
-    String s3SecretKey
+    String s3SecretKey,
+    String jdbcUser,
+    String jdbcPassword
 ) {
     /** Disabled by default — the system works correctly without Iceberg. */
     public static IcebergConfig disabled() {
         return new IcebergConfig(
             false, "1m", "jdbc", "s3a://iceberg-warehouse/",
             "jdbc:postgresql://localhost:5432/iceberg",
-            "http://localhost:9000", "minioadmin", "minioadmin"
-        );
-    }
-
-    /** JDBC catalog + MinIO (matches Fluss quickstart). */
-    public static IcebergConfig localJdbc() {
-        return new IcebergConfig(
-            true, "30s", "jdbc",
-            "s3a://iceberg-warehouse/",
-            "jdbc:postgresql://localhost:5432/iceberg",
-            "http://localhost:9000", "minioadmin", "minioadmin"
+            "http://localhost:9000", "minioadmin", "minioadmin",
+            "hive", "hive"
         );
     }
 
@@ -65,8 +60,8 @@ public record IcebergConfig(
             props.put("datalake.iceberg.uri", hiveMetastoreUri);
         } else if ("jdbc".equalsIgnoreCase(catalogType)) {
             props.put("datalake.iceberg.uri", hiveMetastoreUri);
-            props.put("datalake.iceberg.jdbc.user", "hive");
-            props.put("datalake.iceberg.jdbc.password", "hive");
+            props.put("datalake.iceberg.jdbc.user", jdbcUser);
+            props.put("datalake.iceberg.jdbc.password", jdbcPassword);
         }
 
         return props;

@@ -1,4 +1,4 @@
-package com.knative.fluss.broker.ingress.mapping;
+package com.knative.fluss.broker.common.model;
 
 import com.knative.fluss.broker.common.model.Envelope;
 import org.junit.jupiter.api.Test;

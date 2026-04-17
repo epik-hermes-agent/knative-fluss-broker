@@ -22,6 +22,12 @@ public class SubscriberClient {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriberClient.class);
     private static final MediaType JSON = MediaType.get("application/cloudevents+json; charset=utf-8");
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER;
+
+    static {
+        OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+        OBJECT_MAPPER.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+    }
 
     private final OkHttpClient httpClient;
     private final DeliveryConfig config;
@@ -98,9 +104,7 @@ public class SubscriberClient {
     /** Serialize a CloudEvent to structured JSON. */
     private String serializeCloudEvent(CloudEvent event) {
         try {
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-            var node = mapper.createObjectNode();
+            var node = OBJECT_MAPPER.createObjectNode();
             node.put("specversion", event.getSpecVersion().toString());
             node.put("id", event.getId());
             node.put("source", event.getSource().toString());
@@ -122,7 +126,7 @@ public class SubscriberClient {
                 Object val = event.getExtension(ext);
                 if (val != null) node.put(ext, val.toString());
             }
-            return mapper.writeValueAsString(node);
+            return OBJECT_MAPPER.writeValueAsString(node);
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize CloudEvent", e);
         }

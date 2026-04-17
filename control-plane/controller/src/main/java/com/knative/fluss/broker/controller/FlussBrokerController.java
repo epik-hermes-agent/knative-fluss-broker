@@ -35,7 +35,14 @@ public class FlussBrokerController {
 
         // --- Fluss connection ---
         String flussEndpoint = System.getenv().getOrDefault("FLUSS_ENDPOINT", "fluss://fluss-release:9123");
-        FlussConfig flussConfig = new FlussConfig(flussEndpoint, 100, 50, 10000, 3, 100);
+        FlussConfig flussConfig = new FlussConfig(
+            flussEndpoint,   // endpoint
+            100,             // writeBatchSize
+            50,              // writeBatchTimeoutMs
+            10000,           // ackTimeoutMs
+            3,               // writeMaxRetries
+            100              // writeRetryBackoffMs
+        );
         FlussConnectionManager connectionManager = new FlussConnectionManager(flussConfig);
         FlussTableManager tableManager = new FlussTableManager(connectionManager);
 

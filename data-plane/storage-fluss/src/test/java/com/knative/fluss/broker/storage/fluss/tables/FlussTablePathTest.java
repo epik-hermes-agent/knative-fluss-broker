@@ -17,7 +17,7 @@ class FlussTablePathTest {
     void shouldCreateDlqTablePath() {
         var path = FlussTablePath.dlqTable("default", "my-broker", "my-trigger");
         assertThat(path.database()).isEqualTo("knative_default");
-        assertThat(path.table()).isEqualTo("dlq_my_trigger");
+        assertThat(path.table()).isEqualTo("dlq_my_broker_my_trigger");
     }
 
     @Test

@@ -28,6 +28,13 @@ public class TriggerDispatcher implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(TriggerDispatcher.class);
 
+    /** Max events to scan per poll cycle. */
+    private static final int SCAN_BATCH_SIZE = 50;
+    /** Sleep when no events are available. */
+    private static final long NO_EVENT_SLEEP_MS = 50;
+    /** Sleep when all lanes are paused. */
+    private static final long ALL_PAUSED_SLEEP_MS = 100;
+
     private final String triggerKey;
     private final FlussTablePath tablePath;
     private final String subscriberUri;
@@ -107,24 +114,23 @@ public class TriggerDispatcher implements AutoCloseable {
                     .toList();
 
                 if (activeLanes.isEmpty()) {
-                    Thread.sleep(100);
+                    Thread.sleep(ALL_PAUSED_SLEEP_MS);
                     continue;
                 }
 
                 // Scan events from Fluss
-                List<Envelope> events = scanner.scan(tablePath, triggerKey, 50);
+                List<Envelope> events = scanner.scan(tablePath, triggerKey, SCAN_BATCH_SIZE);
                 if (events.isEmpty()) {
-                    Thread.sleep(50); // No events — back off
+                    Thread.sleep(NO_EVENT_SLEEP_MS); // No events — back off
                     continue;
                 }
 
                 // Distribute to lanes (round-robin, skip paused)
-                int distributed = 0;
+                int matched = 0;
                 for (Envelope event : events) {
                     // Apply trigger filter
                     if (!EventFilter.matches(event, filterAttributes)) {
-                        distributed++;
-                        continue; // Skip non-matching events
+                        continue; // Skip non-matching events — don't advance cursor past them
                     }
 
                     // Find an active lane (round-robin)
@@ -141,11 +147,11 @@ public class TriggerDispatcher implements AutoCloseable {
                         log.debug("All lanes full, will retry in next scan");
                         break;
                     }
-                    distributed++;
+                    matched++;
                 }
 
-                // Advance cursor
-                scanner.advanceCursor(triggerKey, distributed);
+                // Advance cursor only for matched (and enqueued) events
+                scanner.advanceCursor(triggerKey, matched);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

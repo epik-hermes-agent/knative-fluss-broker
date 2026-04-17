@@ -26,6 +26,7 @@ public class FlussTableManager {
 
     private static final Logger log = LoggerFactory.getLogger(FlussTableManager.class);
     private static final long DDL_TIMEOUT_SECONDS = 30;
+    private static final int DEFAULT_BUCKET_COUNT = 8;
 
     private final FlussConnectionManager connectionManager;
     private final ConcurrentHashMap<String, Boolean> ensuredDatabases = new ConcurrentHashMap<>();
@@ -126,7 +127,7 @@ public class FlussTableManager {
                 Schema schema = buildBrokerTableSchema();
                 TableDescriptor descriptor = TableDescriptor.builder()
                         .schema(schema)
-                        .distributedBy(8, "event_id")
+                        .distributedBy(DEFAULT_BUCKET_COUNT, "event_id")
                         .comment("Knative broker event log table")
                         .build();
                 TablePath flussPath = TablePath.of(tablePath.database(), tablePath.table());
@@ -166,7 +167,7 @@ public class FlussTableManager {
                 Schema schema = buildDlqTableSchema();
                 TableDescriptor descriptor = TableDescriptor.builder()
                         .schema(schema)
-                        .distributedBy(8, "event_id")
+                        .distributedBy(DEFAULT_BUCKET_COUNT, "event_id")
                         .comment("Dead letter queue for failed event deliveries")
                         .build();
                 TablePath flussPath = TablePath.of(tablePath.database(), tablePath.table());
