@@ -14,6 +14,8 @@ dependencies {
     testImplementation(project(":test:wiremock"))
     
     testImplementation(libs.bundles.testing.core)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.junit.jupiter)
     testImplementation(libs.bundles.testing.containers)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.testcontainers.minio)

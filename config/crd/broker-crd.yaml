@@ -68,7 +68,7 @@ spec:
                           default: "s3a://iceberg-warehouse/"
                         hive-endpoint:
                           type: string
-                          default: "thrift://hive-metastore:9083"
+                          default: "jdbc:postgresql://postgres:5432/iceberg"
             status:
               type: object
               properties:

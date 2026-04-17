@@ -1,0 +1,14 @@
+# ZooKeeper Helm values for Kind e2e testing
+# Bitnami ZooKeeper chart: helm repo add bitnami https://charts.bitnami.com/bitnami
+replicaCount: 1
+auth:
+  enabled: false
+persistence:
+  enabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

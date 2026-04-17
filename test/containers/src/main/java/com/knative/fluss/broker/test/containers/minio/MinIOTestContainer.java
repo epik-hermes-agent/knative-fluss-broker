@@ -5,11 +5,13 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * Testcontainers wrapper for MinIO (S3-compatible storage).
+ * Uses pgsty/minio community fork for faster pulls.
  * Used for Iceberg tiering integration tests.
  */
 public class MinIOTestContainer extends MinIOContainer {
 
-    private static final DockerImageName IMAGE = DockerImageName.parse("minio/minio:latest");
+    private static final DockerImageName IMAGE = DockerImageName.parse("pgsty/minio")
+            .asCompatibleSubstituteFor("minio/minio");
 
     public MinIOTestContainer() {
         super(IMAGE);

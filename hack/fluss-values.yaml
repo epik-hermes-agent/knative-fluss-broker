@@ -1,0 +1,33 @@
+# Fluss Helm values for Kind e2e testing
+# Chart: https://downloads.apache.org/incubator/fluss/helm-chart/0.9.0-incubating/
+
+image:
+  repository: apache/fluss
+  tag: 0.9.0-incubating
+  pullPolicy: IfNotPresent
+
+# Single tablet server for e2e (lighter footprint)
+tablet:
+  numberOfReplicas: 1
+  storage:
+    enabled: false
+
+coordinator:
+  storage:
+    enabled: false
+
+# ZooKeeper connection
+configurationOverrides:
+  zookeeper.address: "zk-zookeeper.default.svc.cluster.local:2181"
+  zookeeper.path.root: "/fluss"
+  default.bucket.number: "1"
+  default.replication.factor: "1"
+
+# Resource limits for Kind
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

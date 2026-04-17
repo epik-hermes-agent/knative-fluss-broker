@@ -7,7 +7,7 @@ include(":data-plane:dispatcher")
 include(":data-plane:storage-fluss")
 include(":data-plane:schema")
 include(":data-plane:delivery")
-include(":data-plane:iceberg-tiering")
+
 
 // Control plane modules
 include(":control-plane:api")

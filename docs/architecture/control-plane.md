@@ -54,7 +54,7 @@ spec:
       # When enabled:
       # catalog-type: "hive"
       # warehouse: "s3a://warehouse/"
-      # hive-endpoint: "thrift://hive-metastore:9083"
+      # catalog-uri: "jdbc:postgresql://postgres:5432/iceberg"
 status:
   conditions:
     - type: Ready
@@ -180,7 +180,7 @@ BrokerReconciler.reconcile(Broker broker):
   |
   5. [If iceberg.enabled]
   |    - Ensure Iceberg tiering CronJob
-  |    - Configure Hive Metastore connection
+  |    - Configure JDBC catalog connection
   |    - Configure S3 credentials
   |
   6. Update Broker status

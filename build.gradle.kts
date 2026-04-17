@@ -35,6 +35,17 @@ subprojects {
             events("passed", "skipped", "failed")
             showStandardStreams = true
         }
+        // Pass Docker socket to forked test JVMs (needed for Testcontainers on macOS Docker Desktop)
+        jvmArgs(
+            "-Dtestcontainers.dockerSocket=/Users/pasha/.docker/run/docker.sock",
+            "-DDOCKER_HOST=unix:///Users/pasha/.docker/run/docker.sock",
+            // Required for Apache Arrow (used by Fluss client) on Java 17+
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+        )
+        environment("DOCKER_HOST", "unix:///Users/pasha/.docker/run/docker.sock")
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/Users/pasha/.docker/run/docker.sock")
     }
 
     afterEvaluate {

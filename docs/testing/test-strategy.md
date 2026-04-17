@@ -11,7 +11,7 @@
 - Retry queue scheduling
 - Config objects
 
-**Run:** `./gradlew test`
+**Run:** `make test` or `./gradlew test`
 
 ### Layer 2: Integration Tests (Docker required)
 - Ingress → Fluss persistence
@@ -21,22 +21,40 @@
 - Schema registry operations
 - Backpressure lane pause/resume
 
-**Run:** `./gradlew integrationTest`
+**Run:** `make test-integration` or `./gradlew integrationTest`
 
-### Layer 3: E2E Tests (full stack)
+### Layer 3: E2E Tests — Data Plane (docker-compose Fluss)
 - Producer → Ingress → Fluss → Dispatcher → Subscriber
-- Slow subscriber backpressure scenario
+- Real Fluss cluster, no mocking of storage
+- WireMock subscriber stubs
 - DLQ path for poison messages
-- Iceberg tiering path (when enabled)
 
-**Run:** `./gradlew e2eTest`
+**Run:** `make test-e2e` or `./gradlew :test:e2e:test`
 
 ### Layer 4: Performance Smoke Tests
 - Batch publish + fast subscriber throughput
 - Slow subscriber bounded in-flight behavior
 - Multi-trigger fairness
 
-**Run:** `./gradlew performanceSmokeTest`
+**Run:** `make test-perf` or `./gradlew :test:performance-smoke:test`
+
+### Layer 5: K8s E2E Tests (Kind + Knative)
+- Full Kubernetes deployment via Kind
+- Knative Eventing installed
+- ZooKeeper + Fluss deployed via Helm
+- Controller deployed as K8s Deployment
+- Broker and Trigger CRD lifecycle
+- End-to-end event flow through real K8s infrastructure
+
+**Run:** `make test-e2e-k8s` or individual phases:
+```bash
+make kind-up       # Create/reuse Kind cluster
+make kind-install  # Install Knative + ZooKeeper + Fluss
+make kind-deploy   # Build + deploy controller + CRDs
+make kind-test     # Run e2e assertions
+make kind-debug    # Collect logs (on failure)
+make kind-down     # Tear down
+```
 
 ## Test Profiles
 
@@ -44,15 +62,22 @@
 Core broker behavior without Iceberg infrastructure.
 
 ```bash
-./gradlew test integrationTest
+make test test-integration
 ```
 
 ### Lakehouse Profile
-Full stack including Flink, MinIO, Hive Metastore.
+Full stack including Flink, MinIO, PostgreSQL.
 
 ```bash
 docker compose --profile lakehouse up -d
-./gradlew test integrationTest e2eTest -Plakehouse
+make test test-integration test-e2e
+```
+
+### K8s Profile
+Full Kubernetes deployment with Kind.
+
+```bash
+make test-e2e-k8s
 ```
 
 ## Testcontainers
@@ -62,7 +87,7 @@ docker compose --profile lakehouse up -d
 | Fluss | Event storage integration |
 | MinIO | S3-compatible storage for Iceberg |
 | WireMock | HTTP subscriber stubs |
-| PostgreSQL | Hive Metastore backend (lakehouse) |
+| PostgreSQL | JDBC catalog backend (lakehouse) |
 
 ## WireMock Scenarios
 
@@ -79,3 +104,4 @@ docker compose --profile lakehouse up -d
 - Unit test coverage: 80%+ for business logic
 - Integration coverage: all data paths verified
 - E2E coverage: happy path + 2 failure scenarios
+- K8s e2e: CRD lifecycle + controller reconciliation

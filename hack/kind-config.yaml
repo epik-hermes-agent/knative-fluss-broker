@@ -1,0 +1,26 @@
+# Kind cluster config for e2e testing
+# Creates a multi-node cluster with port mappings
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: knative-fluss-broker
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.34.3
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # Knative ingress (for sending CloudEvents)
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  - role: worker
+    image: kindest/node:v1.34.3
+  - role: worker
+    image: kindest/node:v1.34.3

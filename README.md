@@ -1,6 +1,6 @@
 # Knative Fluss Broker
 
-A Knative-native event broker backed by [Apache Fluss](https://fluss.apache.org/) for durable, low-latency event storage with optional Apache Iceberg lakehouse tiering.
+A Knative-native event broker backed by [Apache Fluss](https://fluss.apache.org/) for durable, low-latency event storage with optional Apache Iceberg lakehouse tiering (via Fluss's built-in capability).
 
 ## Overview
 
@@ -11,7 +11,7 @@ Key features:
 - **Knative Broker/Trigger** - Full CRD implementation with CloudEvents support
 - **Credit-Based Backpressure** - Per-subscriber delivery with configurable concurrency and backpressure
 - **Schema-Aware** - Explicit schema_id and schema_version columns in the event envelope
-- **Optional Iceberg Tiering** - Toggleable lakehouse tiering via Fluss -> Iceberg compaction with S3 storage
+- **Optional Iceberg Tiering** - Fluss's built-in lakehouse tiering via `fluss-lake-iceberg` plugin
 - **At-Least-Once Delivery** - Retry with exponential backoff and Dead Letter Queue support
 
 ## Architecture
@@ -34,9 +34,9 @@ Key features:
                                                               |
                                     [Optional]                v
                           +-------------------+      +------------------+
-                          |  Iceberg Tiering  | <--> |  Iceberg Table   |
-                          +-------------------+      |  (S3 + Catalog)  |
-                                                     +------------------+
+                          | Fluss Tiering Job | <--> |  Iceberg Table   |
+                          | (built-in JAR)    |      |  (S3 + JDBC Cat) |
+                          +-------------------+      +------------------+
 ```
 
 ## Prerequisites
@@ -50,14 +50,22 @@ Key features:
 
 ```
 knative-fluss-broker/
-  broker-common/          # Shared models, CloudEvent envelope, schema registry client
-  broker-ingress/         # HTTP ingress accepting CloudEvents
-  broker-dispatcher/      # Per-trigger event dispatcher with backpressure
-  broker-reconciler/      # Kubernetes reconciler for Broker/Trigger CRDs
-  broker-iceberg/         # Iceberg tiering integration (optional module)
-  broker-runtime/         # Spring Boot application assembly
-  docs/                   # Architecture docs, ADRs, runbooks
-  gradle/                 # Gradle wrapper and version catalog
+  data-plane/common/       # Shared models, CloudEvent envelope, config records
+  data-plane/ingress/      # HTTP ingress accepting CloudEvents
+  data-plane/dispatcher/   # Per-trigger event dispatcher with backpressure
+  data-plane/storage-fluss/# Fluss client and table management
+  data-plane/schema/       # Schema registry and validation
+  data-plane/delivery/     # HTTP delivery and tracking
+  control-plane/api/       # CRD models (Broker, Trigger)
+  control-plane/controller/# Kubernetes reconcilers
+  test/testlib/            # Shared test utilities
+  test/containers/         # Testcontainers definitions
+  test/wiremock/           # WireMock scenarios
+  test/integration/        # Integration tests
+  test/e2e/                # End-to-end tests
+  test/performance-smoke/  # Performance benchmarks
+  docs/                    # Architecture docs, ADRs, runbooks
+  gradle/                  # Gradle wrapper and version catalog
 ```
 
 ## Build
@@ -70,7 +78,7 @@ knative-fluss-broker/
 ./gradlew build -x integrationTest
 
 # Build a specific module
-./gradlew :broker-ingress:build
+./gradlew :data-plane:ingress:build
 ```
 
 ## Test
@@ -86,23 +94,40 @@ knative-fluss-broker/
 ./gradlew build jacocoTestReport
 
 # Run a specific test class
-./gradlew test --tests "com.fluss.knative.broker.ingress.IngressHandlerTest"
+./gradlew test --tests "com.knative.fluss.broker.ingress.IngressHandlerTest"
 ```
 
 ## Run Locally
 
 ```bash
-# Start infrastructure (Fluss, ZooKeeper, MinIO, Hive Metastore)
+# Start infrastructure (Fluss, ZooKeeper, MinIO)
 docker compose -f docker/docker-compose.yml up -d
 
 # Run the broker
 ./gradlew :broker-runtime:bootRun --args='--spring.profiles.active=local'
-
-# Or run with Iceberg tiering enabled
-./gradlew :broker-runtime:bootRun --args='--spring.profiles.active=local,iceberg'
 ```
 
 See [docs/runbooks/local-dev.md](docs/runbooks/local-dev.md) for the full local development workflow.
+
+## Iceberg Tiering (Optional)
+
+Fluss provides built-in Iceberg tiering — no custom code needed.
+
+```bash
+# Start full lakehouse stack (adds PostgreSQL, Flink, tiering job)
+docker compose --profile lakehouse up -d
+
+# Tiering is configured via Fluss's FLUSS_PROPERTIES in docker-compose.yml:
+#   datalake.format: iceberg
+#   datalake.iceberg.type: jdbc
+#   datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
+#   datalake.iceberg.warehouse: s3a://iceberg-warehouse/
+
+# Tables opt in with:
+#   CREATE TABLE events (...) WITH ('table.datalake.enabled' = 'true')
+```
+
+See [docs/architecture/iceberg-tiering.md](docs/architecture/iceberg-tiering.md) for details.
 
 ## Configuration
 
@@ -129,17 +154,25 @@ knative:
       backoff-multiplier: 2.0
       initial-delay-ms: 1000
       max-delay-ms: 60000
-
-iceberg:
-  enabled: false
-  catalog-type: "hive"
-  warehouse: "s3a://iceberg-warehouse/"
-  hive-metastore:
-    endpoint: "thrift://localhost:9083"
-  tiering:
-    interval-minutes: 10
-    commit-batch-size: 1000
 ```
+
+Iceberg tiering is configured server-side (not in the broker config):
+```yaml
+# In docker-compose.yml FLUSS_PROPERTIES:
+datalake.format: iceberg
+datalake.iceberg.type: jdbc
+datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
+datalake.iceberg.warehouse: s3a://iceberg-warehouse/
+```
+
+## Architecture Diagrams
+
+Interactive SVG diagrams (open in any browser):
+
+- [Fluss as Knative Broker — Event Flow](docs/diagrams/fluss-knative-broker.html)
+- [Fluss + Iceberg Streaming Lakehouse](docs/diagrams/streaming-lakehouse.html)
+- [Test Harness Deployment](docs/diagrams/test-harness-deployment.html)
+- [Apache Fluss Internal Architecture](docs/diagrams/fluss-internals.html)
 
 ## Documentation
 

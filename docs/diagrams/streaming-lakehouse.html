@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluss + Iceberg Streaming Lakehouse</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #a78bfa; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1000px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Fluss + Iceberg Streaming Lakehouse</h1>
+      </div>
+      <p class="subtitle">Three-tier storage: real-time (Fluss) → tiered (S3) → analytical (Iceberg) with transparent union read</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 750">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- ═══ TITLE: THREE TIERS ═══ -->
+        <text x="550" y="30" fill="#94a3b8" font-size="11" font-weight="600" text-anchor="middle">THREE-TIER STORAGE ARCHITECTURE</text>
+
+        <!-- ═══ TIER LABELS ═══ -->
+        <rect x="30" y="60" width="320" height="30" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="190" y="80" fill="#34d399" font-size="11" font-weight="600" text-anchor="middle">HOT TIER — Fluss Log Tables</text>
+
+        <rect x="380" y="60" width="320" height="30" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="540" y="80" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">WARM TIER — Fluss Remote Storage</text>
+
+        <rect x="730" y="60" width="340" height="30" rx="4" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="900" y="80" fill="#a78bfa" font-size="11" font-weight="600" text-anchor="middle">COLD TIER — Iceberg Tables</text>
+
+        <!-- ═══ HOT TIER: FLUSS ═══ -->
+        <!-- Fluss Coordinator -->
+        <rect x="50" y="110" width="140" height="70" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="120" y="135" fill="white" font-size="11" font-weight="600" text-anchor="middle">Coordinator</text>
+        <text x="120" y="152" fill="#94a3b8" font-size="8" text-anchor="middle">metadata, bucket alloc</text>
+        <text x="120" y="165" fill="#34d399" font-size="8" text-anchor="middle">tiering coordination</text>
+
+        <!-- Fluss Tablet Server 1 -->
+        <rect x="50" y="200" width="140" height="100" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="120" y="225" fill="white" font-size="11" font-weight="600" text-anchor="middle">Tablet Server</text>
+        <text x="120" y="245" fill="#94a3b8" font-size="8" text-anchor="middle">LogStore (Arrow IPC)</text>
+        <text x="120" y="260" fill="#94a3b8" font-size="8" text-anchor="middle">KvStore (RocksDB)</text>
+        <text x="120" y="278" fill="#94a3b8" font-size="8" text-anchor="middle">data.dir: local disk</text>
+        <text x="120" y="293" fill="#34d399" font-size="8" text-anchor="middle">sub-second writes</text>
+
+        <!-- ZooKeeper -->
+        <rect x="220" y="200" width="120" height="60" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="280" y="225" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">ZooKeeper</text>
+        <text x="280" y="242" fill="#64748b" font-size="8" text-anchor="middle">cluster coordination</text>
+
+        <!-- Arrow: Coordinator ↔ ZK -->
+        <line x1="190" y1="145" x2="230" y2="210" stroke="#34d399" stroke-width="1" stroke-dasharray="3,3"/>
+        <!-- Arrow: Tablet ↔ ZK -->
+        <line x1="190" y1="235" x2="218" y2="235" stroke="#34d399" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Arrow: Coordinator → Tablet -->
+        <line x1="120" y1="180" x2="120" y2="198" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- ═══ CLIENT WRITES ═══ -->
+        <rect x="50" y="330" width="290" height="60" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="195" y="355" fill="white" font-size="11" font-weight="600" text-anchor="middle">Flink / Kafka Connect / App</text>
+        <text x="195" y="375" fill="#94a3b8" font-size="8" text-anchor="middle">writes via Fluss Flink Connector (fluss-flink-1.20)</text>
+
+        <!-- Arrow: Client → Tablet -->
+        <line x1="120" y1="330" x2="120" y2="302" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="135" y="318" fill="#22d3ee" font-size="8">write</text>
+
+        <!-- ═══ WARM TIER: REMOTE STORAGE ═══ -->
+        <rect x="400" y="110" width="280" height="130" rx="8" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="540" y="135" fill="white" font-size="12" font-weight="600" text-anchor="middle">MinIO / S3</text>
+        <text x="540" y="158" fill="#fbbf24" font-size="9" font-weight="600" text-anchor="middle">remote.data.dir: s3://fluss-data</text>
+        <line x1="420" y1="168" x2="660" y2="168" stroke="#fbbf24" stroke-width="0.5" opacity="0.3"/>
+        <text x="420" y="186" fill="#94a3b8" font-size="8">• Historical log segments (Arrow IPC)</text>
+        <text x="420" y="200" fill="#94a3b8" font-size="8">• KvStore snapshots (RocksDB SST)</text>
+        <text x="420" y="214" fill="#94a3b8" font-size="8">• Tiered by age (configurable)</text>
+        <text x="420" y="228" fill="#fbbf24" font-size="8">• Client reads directly (offloads tablet)</text>
+
+        <!-- Arrow: Tablet → S3 (tiered storage) -->
+        <line x1="190" y1="250" x2="398" y2="175" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="280" y="195" fill="#fbbf24" font-size="8" text-anchor="middle">RemoteLogManager</text>
+        <text x="280" y="207" fill="#fbbf24" font-size="7" text-anchor="middle">upload segments + manifest</text>
+
+        <!-- ═══ ICEBERG TIERING (BRIDGE) ═══ -->
+        <rect x="400" y="280" width="280" height="120" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="540" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">Flink Tiering Job</text>
+        <text x="540" y="322" fill="#a78bfa" font-size="8" text-anchor="middle">fluss-flink-tiering-0.9.0-incubating.jar</text>
+        <line x1="420" y1="332" x2="660" y2="332" stroke="#a78bfa" stroke-width="0.5" opacity="0.3"/>
+        <text x="420" y="350" fill="#94a3b8" font-size="8">1. Scan Fluss log tables</text>
+        <text x="420" y="365" fill="#94a3b8" font-size="8">2. Convert to Iceberg GenericRecord</text>
+        <text x="420" y="380" fill="#94a3b8" font-size="8">3. Write Parquet data files to S3</text>
+        <text x="420" y="395" fill="#a78bfa" font-size="8">4. Commit Iceberg transaction</text>
+
+        <!-- Arrow: Fluss → Tiering -->
+        <line x1="190" y1="265" x2="398" y2="330" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-violet)"/>
+        <text x="280" y="300" fill="#a78bfa" font-size="8" text-anchor="middle">table.datalake.enabled = true</text>
+
+        <!-- Arrow: Tiering → S3 (Iceberg data) -->
+        <line x1="540" y1="240" x2="540" y2="278" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <text x="560" y="262" fill="#a78bfa" font-size="8">Parquet</text>
+
+        <!-- ═══ COLD TIER: ICEBERG ═══ -->
+        <rect x="750" y="110" width="310" height="180" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="905" y="135" fill="white" font-size="12" font-weight="600" text-anchor="middle">Iceberg Tables</text>
+        <text x="905" y="155" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">warehouse: s3a://iceberg-warehouse/</text>
+        <line x1="770" y1="165" x2="1040" y2="165" stroke="#a78bfa" stroke-width="0.5" opacity="0.3"/>
+        <text x="770" y="183" fill="#94a3b8" font-size="8">• ACID transactions</text>
+        <text x="770" y="197" fill="#94a3b8" font-size="8">• Schema evolution</text>
+        <text x="770" y="211" fill="#94a3b8" font-size="8">• Time travel / snapshot queries</text>
+        <text x="770" y="225" fill="#94a3b8" font-size="8">• Parquet columnar format</text>
+        <text x="770" y="241" fill="#a78bfa" font-size="8">• System cols: __bucket, __offset, __timestamp</text>
+        <text x="770" y="257" fill="#94a3b8" font-size="8">• Partitioned by bucket(pk, N)</text>
+        <text x="770" y="273" fill="#94a3b8" font-size="8">• Sorted by __offset ASC</text>
+
+        <!-- Arrow: S3 (Iceberg data) → Iceberg tables -->
+        <line x1="680" y1="175" x2="748" y2="175" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="714" y="168" fill="#fbbf24" font-size="8" text-anchor="middle">data files</text>
+
+        <!-- ═══ JDBC CATALOG ═══ -->
+        <rect x="750" y="310" width="310" height="70" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="905" y="335" fill="white" font-size="11" font-weight="600" text-anchor="middle">JDBC Catalog</text>
+        <text x="905" y="355" fill="#94a3b8" font-size="8" text-anchor="middle">PostgreSQL — schema, snapshots, metadata</text>
+        <text x="905" y="370" fill="#a78bfa" font-size="8" text-anchor="middle">datalake.iceberg.type: jdbc</text>
+
+        <!-- Arrow: Tiering → JDBC Catalog -->
+        <line x1="680" y1="340" x2="748" y2="340" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow-violet)"/>
+        <text x="714" y="333" fill="#a78bfa" font-size="8" text-anchor="middle">commit</text>
+
+        <!-- ═══ UNION READ ═══ -->
+        <rect x="400" y="440" width="280" height="90" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="2"/>
+        <text x="540" y="465" fill="white" font-size="13" font-weight="700" text-anchor="middle">UNION READ</text>
+        <text x="540" y="485" fill="#94a3b8" font-size="9" text-anchor="middle">Fluss transparently combines hot + cold data</text>
+        <text x="540" y="502" fill="#94a3b8" font-size="9" text-anchor="middle">for seamless queries across tiers</text>
+        <text x="540" y="522" fill="#34d399" font-size="8" text-anchor="middle">Flink SQL: SELECT * FROM fluss_table</text>
+
+        <!-- Arrow: Fluss → Union Read -->
+        <line x1="120" y1="390" x2="430" y2="480" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="250" y="440" fill="#34d399" font-size="8" text-anchor="middle">hot data</text>
+
+        <!-- Arrow: Iceberg → Union Read -->
+        <line x1="905" y1="290" x2="620" y2="438" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <text x="800" y="370" fill="#a78bfa" font-size="8" text-anchor="middle">cold data</text>
+
+        <!-- Arrow: S3 warm → Union Read -->
+        <line x1="540" y1="240" x2="540" y2="438" fill="none"/>
+        <path d="M 450 240 Q 450 440 470 445" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow-amber)"/>
+        <text x="430" y="350" fill="#fbbf24" font-size="8" transform="rotate(-80,430,350)">warm data</text>
+
+        <!-- ═══ QUERY ENGINES ═══ -->
+        <rect x="100" y="560" width="160" height="60" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="180" y="585" fill="white" font-size="11" font-weight="600" text-anchor="middle">Flink SQL</text>
+        <text x="180" y="605" fill="#94a3b8" font-size="8" text-anchor="middle">streaming + batch</text>
+
+        <rect x="300" y="560" width="160" height="60" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="380" y="585" fill="white" font-size="11" font-weight="600" text-anchor="middle">Apache Spark</text>
+        <text x="380" y="605" fill="#94a3b8" font-size="8" text-anchor="middle">batch analytics</text>
+
+        <rect x="500" y="560" width="160" height="60" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="580" y="585" fill="white" font-size="11" font-weight="600" text-anchor="middle">Trino</text>
+        <text x="580" y="605" fill="#94a3b8" font-size="8" text-anchor="middle">interactive queries</text>
+
+        <rect x="700" y="560" width="160" height="60" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="780" y="585" fill="white" font-size="11" font-weight="600" text-anchor="middle">Custom App</text>
+        <text x="780" y="605" fill="#94a3b8" font-size="8" text-anchor="middle">Iceberg REST API</text>
+
+        <!-- Arrow: Union Read → Query Engines -->
+        <line x1="340" y1="530" x2="220" y2="558" stroke="#22d3ee" stroke-width="1" marker-end="url(#arrow-cyan)"/>
+        <line x1="450" y1="530" x2="400" y2="558" stroke="#22d3ee" stroke-width="1" marker-end="url(#arrow-cyan)"/>
+        <line x1="590" y1="530" x2="590" y2="558" stroke="#22d3ee" stroke-width="1" marker-end="url(#arrow-cyan)"/>
+        <line x1="700" y1="530" x2="760" y2="558" stroke="#22d3ee" stroke-width="1" marker-end="url(#arrow-cyan)"/>
+
+        <!-- ═══ LEGEND ═══ -->
+        <text x="30" y="660" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="30" y="672" width="16" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="52" y="680" fill="#94a3b8" font-size="8">Fluss (Hot)</text>
+
+        <rect x="30" y="688" width="16" height="10" rx="2" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="52" y="696" fill="#94a3b8" font-size="8">S3 / MinIO (Warm)</text>
+
+        <rect x="30" y="704" width="16" height="10" rx="2" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="52" y="712" fill="#94a3b8" font-size="8">Iceberg (Cold)</text>
+
+        <rect x="170" y="672" width="16" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="192" y="680" fill="#94a3b8" font-size="8">Query Engine</text>
+
+        <line x1="170" y1="694" x2="186" y2="694" stroke="#fbbf24" stroke-width="1"/>
+        <text x="192" y="697" fill="#94a3b8" font-size="8">Data Flow</text>
+
+        <line x1="170" y1="710" x2="186" y2="710" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="192" y="713" fill="#94a3b8" font-size="8">Metadata</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Hot Tier — Fluss</h3>
+        </div>
+        <ul>
+          <li>• Arrow IPC columnar on local disk</li>
+          <li>• RocksDB for primary key lookups</li>
+          <li>• Sub-second read/write latency</li>
+          <li>• Adapted Kafka replication protocol</li>
+          <li>• Streaming reads via LogScanner</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Warm Tier — Fluss Remote Storage</h3>
+        </div>
+        <ul>
+          <li>• Log segments uploaded to S3 by tablet server</li>
+          <li>• Client reads directly (offloads tablets)</li>
+          <li>• KvStore snapshots for recovery</li>
+          <li>• Configurable retention policy</li>
+          <li>• Automatic via RemoteLogManager</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>Cold Tier — Iceberg</h3>
+        </div>
+        <ul>
+          <li>• ACID transactions, time travel</li>
+          <li>• Schema evolution support</li>
+          <li>• Parquet columnar format</li>
+          <li>• JDBC catalog (PostgreSQL)</li>
+          <li>• Readable by Spark, Trino, Flink</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">Knative Fluss Broker • Streaming Lakehouse Architecture • 2026</p>
+  </div>
+</body>
+</html>

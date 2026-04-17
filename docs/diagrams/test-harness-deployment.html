@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Harness Deployment</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #34d399; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1000px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Test Harness Deployment</h1>
+      </div>
+      <p class="subtitle">Three test paths: Unit (fast) → Integration (docker-compose) → K8s e2e (Kind + Knative)</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 680">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- ═══ LAYER 1: UNIT TESTS ═══ -->
+        <rect x="30" y="30" width="340" height="120" rx="10" fill="rgba(6,78,59,0.15)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="50" y="55" fill="#34d399" font-size="11" font-weight="700">LAYER 1: UNIT TESTS</text>
+        <text x="50" y="75" fill="#94a3b8" font-size="9">Command: make test / ./gradlew test</text>
+        <text x="50" y="95" fill="#94a3b8" font-size="9">• Envelope model, CloudEvent mapping</text>
+        <text x="50" y="112" fill="#94a3b8" font-size="9">• Filter evaluation, backpressure logic</text>
+        <text x="50" y="129" fill="#94a3b8" font-size="9">• Schema validation, config records</text>
+        <text x="50" y="146" fill="#34d399" font-size="8">⏱ ~15s • No Docker required</text>
+
+        <!-- ═══ LAYER 2: INTEGRATION TESTS ═══ -->
+        <rect x="30" y="170" width="340" height="140" rx="10" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="50" y="195" fill="#34d399" font-size="11" font-weight="700">LAYER 2: INTEGRATION TESTS</text>
+        <text x="50" y="215" fill="#94a3b8" font-size="9">Command: make test-integration</text>
+        <text x="50" y="235" fill="#94a3b8" font-size="9">• Ingress → Fluss persistence</text>
+        <text x="50" y="252" fill="#94a3b8" font-size="9">• Fluss → Dispatcher → WireMock</text>
+        <text x="50" y="269" fill="#94a3b8" font-size="9">• Retry with backoff, DLQ routing</text>
+        <text x="50" y="286" fill="#94a3b8" font-size="9">• Backpressure lane pause/resume</text>
+        <text x="50" y="303" fill="#34d399" font-size="8">⏱ ~45s • Requires docker-compose Fluss</text>
+
+        <!-- ═══ LAYER 3: E2E TESTS ═══ -->
+        <rect x="30" y="330" width="340" height="120" rx="10" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="50" y="355" fill="#34d399" font-size="11" font-weight="700">LAYER 3: E2E (DATA PLANE)</text>
+        <text x="50" y="375" fill="#94a3b8" font-size="9">Command: make test-e2e</text>
+        <text x="50" y="395" fill="#94a3b8" font-size="9">• Full pipeline: Ingress → Fluss → Dispatch</text>
+        <text x="50" y="412" fill="#94a3b8" font-size="9">• Real Fluss cluster, WireMock subscriber</text>
+        <text x="50" y="429" fill="#94a3b8" font-size="9">• DLQ path, CloudEvent extensions</text>
+        <text x="50" y="446" fill="#34d399" font-size="8">⏱ ~60s • Requires docker-compose Fluss</text>
+
+        <!-- ═══ LAYER 4: PERF SMOKE ═══ -->
+        <rect x="30" y="470" width="340" height="80" rx="10" fill="rgba(6,78,59,0.1)" stroke="#34d399" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="50" y="495" fill="#34d399" font-size="11" font-weight="700">LAYER 4: PERFORMANCE SMOKE</text>
+        <text x="50" y="515" fill="#94a3b8" font-size="9">Command: make test-perf</text>
+        <text x="50" y="532" fill="#94a3b8" font-size="9">• Batch throughput, bounded in-flight</text>
+        <text x="50" y="546" fill="#34d399" font-size="8">⏱ ~30s • Requires docker-compose Fluss</text>
+
+        <!-- Arrow: Layer 1 → 2 → 3 → 4 -->
+        <line x1="200" y1="150" x2="200" y2="168" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="200" y1="310" x2="200" y2="328" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="200" y1="450" x2="200" y2="468" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ═══ DOCKER-COMPOSE INFRASTRUCTURE ═══ -->
+        <rect x="410" y="30" width="280" height="520" rx="10" fill="rgba(120,53,15,0.08)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,4"/>
+        <text x="550" y="55" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">Docker Compose (shared infra)</text>
+
+        <rect x="430" y="70" width="240" height="55" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="550" y="92" fill="white" font-size="11" font-weight="600" text-anchor="middle">Fluss Coordinator</text>
+        <text x="550" y="110" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:9123</text>
+
+        <rect x="430" y="135" width="240" height="55" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="550" y="157" fill="white" font-size="11" font-weight="600" text-anchor="middle">Fluss Tablet Server</text>
+        <text x="550" y="175" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:9124</text>
+
+        <rect x="430" y="200" width="240" height="55" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="550" y="222" fill="white" font-size="11" font-weight="600" text-anchor="middle">ZooKeeper</text>
+        <text x="550" y="240" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:2181</text>
+
+        <rect x="430" y="265" width="240" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="550" y="287" fill="white" font-size="11" font-weight="600" text-anchor="middle">MinIO (pgsty/minio)</text>
+        <text x="550" y="305" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:9000 • S3-compatible</text>
+
+        <rect x="430" y="340" width="240" height="50" rx="6" fill="rgba(30,41,59,0.4)" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="550" y="362" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">WireMock</text>
+        <text x="550" y="380" fill="#64748b" font-size="8" text-anchor="middle">Subscriber stubs (in-process)</text>
+
+        <!-- Lakehouse profile extras -->
+        <rect x="430" y="410" width="240" height="130" rx="8" fill="rgba(76,29,149,0.15)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="550" y="432" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">--profile lakehouse</text>
+        <text x="550" y="452" fill="#94a3b8" font-size="8" text-anchor="middle">PostgreSQL (JDBC catalog)</text>
+        <text x="550" y="468" fill="#94a3b8" font-size="8" text-anchor="middle">Flink JobManager + TaskManager</text>
+        <text x="550" y="484" fill="#94a3b8" font-size="8" text-anchor="middle">fluss-lake-iceberg plugin</text>
+        <text x="550" y="500" fill="#94a3b8" font-size="8" text-anchor="middle">fluss-flink-tiering JAR</text>
+        <text x="550" y="516" fill="#94a3b8" font-size="8" text-anchor="middle">Iceberg warehouse bucket</text>
+        <text x="550" y="532" fill="#a78bfa" font-size="8" text-anchor="middle">make test test-integration test-e2e</text>
+
+        <!-- Arrows: Tests → Docker -->
+        <line x1="370" y1="90" x2="428" y2="230" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="370" y1="240" x2="428" y2="230" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="370" y1="390" x2="428" y2="230" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="395" y="240" fill="#fbbf24" font-size="8" text-anchor="middle" transform="rotate(-20,395,240)">localhost:9123</text>
+
+        <!-- ═══ LAYER 5: K8S E2E ═══ -->
+        <rect x="730" y="30" width="340" height="520" rx="10" fill="rgba(76,29,149,0.08)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="900" y="55" fill="#a78bfa" font-size="11" font-weight="700" text-anchor="middle">LAYER 5: K8s E2E (Kind)</text>
+        <text x="900" y="73" fill="#94a3b8" font-size="9" text-anchor="middle">Command: make test-e2e-k8s</text>
+
+        <!-- Kind cluster -->
+        <rect x="750" y="90" width="300" height="440" rx="8" fill="rgba(120,53,15,0.06)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="900" y="108" fill="#fbbf24" font-size="9" font-weight="600" text-anchor="middle">Kind Cluster (3 nodes)</text>
+
+        <!-- Knative -->
+        <rect x="770" y="122" width="260" height="55" rx="6" fill="rgba(251,146,60,0.2)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="900" y="144" fill="white" font-size="10" font-weight="600" text-anchor="middle">Knative Eventing v1.16</text>
+        <text x="900" y="162" fill="#94a3b8" font-size="8" text-anchor="middle">Broker + Trigger + InMemoryChannel</text>
+
+        <!-- ZooKeeper Helm -->
+        <rect x="770" y="187" width="120" height="45" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="830" y="205" fill="white" font-size="10" font-weight="600" text-anchor="middle">ZooKeeper</text>
+        <text x="830" y="222" fill="#94a3b8" font-size="7" text-anchor="middle">Bitnami Helm</text>
+
+        <!-- Fluss Helm -->
+        <rect x="900" y="187" width="130" height="45" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="965" y="205" fill="white" font-size="10" font-weight="600" text-anchor="middle">Fluss</text>
+        <text x="965" y="222" fill="#94a3b8" font-size="7" text-anchor="middle">Apache Helm chart</text>
+
+        <!-- Controller -->
+        <rect x="770" y="250" width="260" height="65" rx="6" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="900" y="272" fill="white" font-size="10" font-weight="600" text-anchor="middle">FlussBrokerController</text>
+        <text x="900" y="290" fill="#94a3b8" font-size="8" text-anchor="middle">Reconciles Broker + Trigger CRDs</text>
+        <text x="900" y="306" fill="#94a3b8" font-size="8" text-anchor="middle">RBAC: get/list/watch on eventing.fluss.io</text>
+
+        <!-- CRDs -->
+        <rect x="770" y="330" width="120" height="40" rx="6" fill="rgba(251,146,60,0.25)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="830" y="348" fill="white" font-size="9" font-weight="600" text-anchor="middle">Broker CRD</text>
+        <text x="830" y="362" fill="#94a3b8" font-size="7" text-anchor="middle">eventing.fluss.io</text>
+
+        <rect x="900" y="330" width="120" height="40" rx="6" fill="rgba(251,146,60,0.25)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="960" y="348" fill="white" font-size="9" font-weight="600" text-anchor="middle">Trigger CRD</text>
+        <text x="960" y="362" fill="#94a3b8" font-size="7" text-anchor="middle">eventing.fluss.io</text>
+
+        <!-- Test namespace -->
+        <rect x="770" y="390" width="260" height="130" rx="8" fill="rgba(76,29,149,0.1)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="900" y="410" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">Namespace: e2e-test</text>
+
+        <rect x="790" y="420" width="220" height="35" rx="5" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="900" y="440" fill="white" font-size="9" font-weight="600" text-anchor="middle">Broker "e2e-broker"</text>
+
+        <rect x="790" y="462" width="220" height="35" rx="5" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="900" y="482" fill="white" font-size="9" font-weight="600" text-anchor="middle">Trigger "e2e-trigger" → Sink</text>
+
+        <rect x="790" y="504" width="220" height="30" rx="5" fill="rgba(30,41,59,0.4)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="900" y="522" fill="white" font-size="9" text-anchor="middle">Sink: http-echo</text>
+
+        <!-- Arrows within K8s -->
+        <line x1="900" y1="177" x2="900" y2="248" stroke="#fb923c" stroke-width="1" marker-end="url(#arrow)"/>
+        <line x1="900" y1="315" x2="830" y2="328" stroke="#fb923c" stroke-width="1" marker-end="url(#arrow)"/>
+        <line x1="900" y1="315" x2="960" y2="328" stroke="#fb923c" stroke-width="1" marker-end="url(#arrow)"/>
+
+        <!-- ═══ LEGEND ═══ -->
+        <text x="30" y="590" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="30" y="602" width="16" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="52" y="610" fill="#94a3b8" font-size="8">Fluss (data plane)</text>
+
+        <rect x="30" y="618" width="16" height="10" rx="2" fill="rgba(251,146,60,0.2)" stroke="#fb923c" stroke-width="1"/>
+        <text x="52" y="626" fill="#94a3b8" font-size="8">Knative (control plane)</text>
+
+        <rect x="30" y="634" width="16" height="10" rx="2" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="52" y="642" fill="#94a3b8" font-size="8">Iceberg / Lakehouse</text>
+
+        <rect x="200" y="602" width="16" height="10" rx="2" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="222" y="610" fill="#94a3b8" font-size="8">Docker / Infra</text>
+
+        <rect x="200" y="618" width="16" height="10" rx="2" fill="rgba(30,41,59,0.4)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="222" y="626" fill="#94a3b8" font-size="8">External / Test</text>
+
+        <line x1="200" y1="640" x2="216" y2="640" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="222" y="643" fill="#94a3b8" font-size="8">Boundary</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Fast Path (default)</h3>
+        </div>
+        <ul>
+          <li>• make test → unit tests (~15s)</li>
+          <li>• make test-integration → docker-compose Fluss</li>
+          <li>• make test-e2e → full data plane pipeline</li>
+          <li>• Total: ~90s for full build</li>
+          <li>• Requires: Docker running</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Infrastructure</h3>
+        </div>
+        <ul>
+          <li>• scripts/bootstrap.sh starts everything</li>
+          <li>• Fluss 0.9.0-incubating (dual listeners)</li>
+          <li>• pgsty/minio for S3-compatible storage</li>
+          <li>• WireMock in-process (no container)</li>
+          <li>• Lakehouse: +PostgreSQL + Flink</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>K8s E2E (Kind)</h3>
+        </div>
+        <ul>
+          <li>• make test-e2e-k8s → full pipeline</li>
+          <li>• Kind 3-node cluster + Knative Eventing</li>
+          <li>• Fluss deployed via official Helm chart</li>
+          <li>• Controller as K8s Deployment</li>
+          <li>• Broker → Trigger → Sink lifecycle test</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">Knative Fluss Broker • Test Harness Architecture • 2026</p>
+  </div>
+</body>
+</html>

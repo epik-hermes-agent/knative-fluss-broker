@@ -118,7 +118,7 @@ Activation:
 - Disabled by default
 - Enabled via `iceberg.enabled=true` in broker configuration
 - Uses Fluss's built-in tiering mechanism
-- Hive Metastore as the Iceberg catalog (locally and in dev)
+- JDBC catalog (PostgreSQL) as the Iceberg catalog (local and dev)
 
 ### Schema Registry
 
@@ -139,7 +139,7 @@ Responsibilities:
 | Event Storage | Apache Fluss | 0.7.x |
 | Lakehouse | Apache Iceberg | 1.4.x |
 | Object Store | MinIO (S3-compatible) | latest |
-| Catalog | Hive Metastore | 3.1.3 |
+| Catalog | JDBC (PostgreSQL) | 16-alpine |
 | Framework | Spring Boot | 3.3.x |
 | Kubernetes | fabric8 client | 6.x |
 | Testing | JUnit 5 + Testcontainers | - |

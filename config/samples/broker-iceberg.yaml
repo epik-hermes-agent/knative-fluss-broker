@@ -1,20 +1,30 @@
 apiVersion: eventing.fluss.io/v1alpha1
 kind: Broker
 metadata:
-  name: iceberg-broker
+  name: fluss-broker-iceberg
   namespace: default
 spec:
-  config:
-    fluss:
-      cluster:
-        endpoint: "fluss://fluss-cluster:9123"
-    ingress:
-      replicas: 1
-    schema:
-      enabled: true
-      auto-register: true
-    iceberg:
-      enabled: true
-      catalog-type: "hive"
-      warehouse: "s3a://iceberg-warehouse/"
-      hive-endpoint: "thrift://hive-metastore:9083"
+  fluss:
+    endpoint: "fluss://fluss-coordinator:9123"
+    connectionPool:
+      maxConnections: 100
+      acquireTimeoutMs: 5000
+    retry:
+      maxAttempts: 3
+      backoffMs: 1000
+  ingress:
+    replicas: 2
+    resources:
+      cpu: "500m"
+      memory: "512Mi"
+  # Iceberg tiering is configured server-side in Fluss's FLUSS_PROPERTIES
+  # (not in the Broker CRD). To enable tiering:
+  #   1. Start with: docker compose --profile lakehouse up -d
+  #   2. Tables created by the broker will have 'table.datalake.enabled' = 'true'
+  #
+  # Server-side config in docker-compose.yml:
+  #   datalake.format: iceberg
+  #   datalake.iceberg.type: jdbc
+  #   datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
+  #   datalake.iceberg.warehouse: s3a://iceberg-warehouse/
+  #   datalake.iceberg.s3.endpoint: http://minio:9000

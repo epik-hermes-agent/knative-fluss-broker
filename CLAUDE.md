@@ -4,15 +4,16 @@ A Knative-native event broker backed by Apache Fluss for durable, low-latency ev
 
 ## Architecture
 
-- **Data Plane**: Ingress (HTTP CloudEvents), Dispatcher (credit-based backpressure), Storage (Fluss Log Tables), Schema Registry, Delivery (HTTP push), Iceberg Tiering (optional)
+- **Data Plane**: Ingress (HTTP CloudEvents), Dispatcher (credit-based backpressure), Storage (Fluss Log Tables), Schema Registry, Delivery (HTTP push)
 - **Control Plane**: Kubernetes CRDs (Broker, Trigger), Reconcilers using fabric8
+- **Iceberg Tiering**: Fluss's built-in capability (fluss-lake-iceberg plugin + fluss-flink-tiering JAR) — no custom code
 - **API Group**: `eventing.fluss.io/v1alpha1`
 
 ## Tech Stack
 
 - Java 21, Gradle 8.10+ (Kotlin DSL), Version Catalogs
 - Spring Boot 3.3.x (planned, not yet applied to modules)
-- Fluss 0.7.x, CloudEvents SDK 2.5, fabric8 6.13
+- Fluss 0.9.0-incubating, CloudEvents SDK 2.5, fabric8 6.13
 - OkHttp for HTTP delivery, Jackson for JSON
 - Testcontainers, JUnit 5, AssertJ, Mockito, WireMock
 
@@ -35,9 +36,9 @@ data-plane/dispatcher/   # Per-trigger dispatcher with backpressure
 data-plane/storage-fluss/# Fluss client and table management
 data-plane/schema/       # Schema registry and validation
 data-plane/delivery/     # HTTP delivery and tracking
-data-plane/iceberg-tiering/ # Optional Iceberg compaction
 control-plane/api/       # CRD models (Broker, Trigger)
 control-plane/controller/# Kubernetes reconcilers
+docker/                  # Docker Compose + Fluss native datalake config
 test/testlib/            # Shared test utilities
 test/containers/         # Testcontainers definitions
 test/wiremock/           # WireMock scenarios
@@ -62,3 +63,4 @@ test/performance-smoke/  # Performance benchmarks
 - **Credit Bucket**: Token-bucket backpressure per delivery lane
 - **Trigger**: Knative filter + subscriber binding, maps to one dispatcher instance
 - **Broker**: Knative namespace-scoped event router backed by a Fluss log table
+- **Iceberg Tiering**: Fluss native — configured via `datalake.*` server properties, tables opt in with `table.datalake.enabled = 'true'`

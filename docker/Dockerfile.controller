@@ -1,0 +1,16 @@
+# Build stage
+FROM eclipse-temurin:21-jdk-alpine-3.22 AS builder
+WORKDIR /app
+COPY gradle/ gradle/
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+RUN chmod +x gradlew
+COPY control-plane/ control-plane/
+COPY data-plane/ data-plane/
+RUN ./gradlew :control-plane:controller:installDist --no-daemon
+
+# Runtime stage
+FROM eclipse-temurin:21-jdk-alpine-3.22
+WORKDIR /app
+COPY --from=builder /app/control-plane/controller/build/install/controller/ ./
+EXPOSE 8080
+CMD ["bin/controller"]

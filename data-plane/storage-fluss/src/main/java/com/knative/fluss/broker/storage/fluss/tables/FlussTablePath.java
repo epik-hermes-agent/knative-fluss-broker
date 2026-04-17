@@ -44,7 +44,7 @@ public record FlussTablePath(
         );
     }
 
-    private static String sanitize(String name) {
+    public static String sanitize(String name) {
         return name.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
     }
 }

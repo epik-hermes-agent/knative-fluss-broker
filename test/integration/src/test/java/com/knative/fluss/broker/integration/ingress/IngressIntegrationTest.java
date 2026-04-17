@@ -1,13 +1,15 @@
 package com.knative.fluss.broker.integration.ingress;
 
+import com.knative.fluss.broker.common.config.FlussConfig;
 import com.knative.fluss.broker.common.config.SchemaConfig;
 import com.knative.fluss.broker.ingress.handler.IngressHandler;
 import com.knative.fluss.broker.schema.registry.SchemaRegistry;
+import com.knative.fluss.broker.storage.fluss.client.FlussConnectionManager;
 import com.knative.fluss.broker.storage.fluss.client.FlussEventWriter;
+import com.knative.fluss.broker.storage.fluss.tables.FlussTableManager;
 import com.knative.fluss.broker.storage.fluss.tables.FlussTablePath;
 import io.cloudevents.core.builder.CloudEventBuilder;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.net.URI;
 
@@ -15,36 +17,57 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * Integration test: CloudEvent ingress to Fluss persistence pipeline.
- * Verifies the full ingress pipeline from HTTP receipt to Fluss write.
+ * Requires docker-compose services running:
+ *   docker compose -f docker/docker-compose.yml up -d fluss-coordinator fluss-tablet zookeeper
+ *
+ * <p>Uses the Fluss client to connect to the docker-compose Fluss cluster
+ * at 127.0.0.1:9123 (fixed port mapping in docker-compose.yml).
  */
 class IngressIntegrationTest {
 
-    private static final String ORDER_DATA = "{\"orderId\":\"12345\",\"amount\":99.99}";
-    private static final String FIELD_DATA = "{\"field1\":\"value\"}";
+    private static final String FLUSS_ENDPOINT = "fluss://127.0.0.1:9123";
 
     private IngressHandler handler;
     private FlussEventWriter writer;
-    private SchemaRegistry schemaRegistry;
+    private FlussConnectionManager connectionManager;
+    private FlussTableManager tableManager;
     private FlussTablePath tablePath;
 
     @BeforeEach
     void setUp() {
-        var schemaConfig = SchemaConfig.defaults();
+        FlussConfig flussConfig = new FlussConfig(
+                FLUSS_ENDPOINT,
+                100, 50, 5000, 3, 100
+        );
+        connectionManager = new FlussConnectionManager(flussConfig);
+        tableManager = new FlussTableManager(connectionManager);
+
+        // Create the database and table in real Fluss
         tablePath = FlussTablePath.brokerTable("test", "default");
-        writer = new FlussEventWriter(com.knative.fluss.broker.common.config.FlussConfig.defaults());
-        schemaRegistry = new SchemaRegistry(schemaConfig, FlussTablePath.schemaRegistry("test"));
+        tableManager.ensureDatabase("test");
+        tableManager.ensureBrokerTable(tablePath);
+
+        SchemaConfig schemaConfig = SchemaConfig.defaults();
+        writer = new FlussEventWriter(connectionManager, flussConfig);
+        var schemaRegistry = new SchemaRegistry(schemaConfig, FlussTablePath.schemaRegistry("test"));
         handler = new IngressHandler(writer, schemaRegistry, schemaConfig, tablePath);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (writer != null) writer.close();
+        if (connectionManager != null) connectionManager.close();
     }
 
     @Test
     void shouldAcceptValidCloudEvent() throws Exception {
         var event = CloudEventBuilder.v1()
-            .withId("integration-test-1")
-            .withSource(URI.create("/test/producer"))
-            .withType("com.example.order.created")
-            .withDataContentType("application/json")
-            .withData(ORDER_DATA.getBytes())
-            .build();
+                .withId("integration-test-1")
+                .withSource(URI.create("/test/producer"))
+                .withType("com.example.order.created")
+                .withDataContentType("application/json")
+                .withData("{\"orderId\":\"12345\",\"amount\":99.99}".getBytes())
+                .build();
 
         var envelope = handler.handle(event).get();
 
@@ -56,14 +79,12 @@ class IngressIntegrationTest {
 
     @Test
     void shouldRejectInvalidCloudEvent() {
-        // CloudEventBuilder validates on build() — empty ID causes build failure
-        // Our validator catches these at ingress time
         assertThatThrownBy(() -> {
             var event = CloudEventBuilder.v1()
-                .withId("")
-                .withSource(URI.create("/test"))
-                .withType("com.example.test")
-                .build();
+                    .withId("")
+                    .withSource(URI.create("/test"))
+                    .withType("com.example.test")
+                    .build();
             handler.handle(event).get();
         }).isInstanceOf(Exception.class);
     }
@@ -73,12 +94,12 @@ class IngressIntegrationTest {
         for (int i = 0; i < 5; i++) {
             var data = "{\"index\":" + i + "}";
             var event = CloudEventBuilder.v1()
-                .withId("batch-event-" + i)
-                .withSource(URI.create("/test/batch"))
-                .withType("com.example.batch.event")
-                .withDataContentType("application/json")
-                .withData(data.getBytes())
-                .build();
+                    .withId("batch-event-" + i)
+                    .withSource(URI.create("/test/batch"))
+                    .withType("com.example.batch.event")
+                    .withDataContentType("application/json")
+                    .withData(data.getBytes())
+                    .build();
 
             var envelope = handler.handle(event).get();
             assertThat(envelope.eventId()).isEqualTo("batch-event-" + i);
@@ -88,12 +109,12 @@ class IngressIntegrationTest {
     @Test
     void shouldRegisterSchemaOnFirstEvent() throws Exception {
         var event = CloudEventBuilder.v1()
-            .withId("schema-test-1")
-            .withSource(URI.create("/test"))
-            .withType("com.example.newtype")
-            .withDataContentType("application/json")
-            .withData(FIELD_DATA.getBytes())
-            .build();
+                .withId("schema-test-1")
+                .withSource(URI.create("/test"))
+                .withType("com.example.newtype")
+                .withDataContentType("application/json")
+                .withData("{\"field1\":\"value\"}".getBytes())
+                .build();
 
         var envelope = handler.handle(event).get();
         assertThat(envelope.schemaId()).isGreaterThan(0);

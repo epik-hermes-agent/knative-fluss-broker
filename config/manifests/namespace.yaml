@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-fluss-broker
+  labels:
+    app.kubernetes.io/name: fluss-broker
+    app.kubernetes.io/component: controller
