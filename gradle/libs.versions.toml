@@ -95,7 +95,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 
 [bundles]
 cloudevents = ["cloudevents-api", "cloudevents-json-jackson", "cloudevents-http-basic"]
-testing-core = ["junit-jupiter-api", "junit-jupiter-params", "assertj-core"]
+testing-core = ["junit-jupiter-api", "junit-jupiter-params", "assertj-core", "mockito-core", "mockito-junit-jupiter"]
 testing-containers = ["testcontainers-junit-jupiter"]
 jackson = ["jackson-databind", "jackson-annotations", "jackson-datatype-jsr310"]
 

@@ -23,6 +23,13 @@ public class SubscriberClient {
     private static final Logger log = LoggerFactory.getLogger(SubscriberClient.class);
     private static final MediaType JSON = MediaType.get("application/cloudevents+json; charset=utf-8");
     private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER;
+    /** Dedicated executor for HTTP delivery — avoids starving ForkJoinPool.commonPool() with I/O. */
+    private static final java.util.concurrent.ExecutorService DELIVERY_EXECUTOR =
+        java.util.concurrent.Executors.newCachedThreadPool(r -> {
+            var t = new Thread(r, "subscriber-delivery");
+            t.setDaemon(true);
+            return t;
+        });
 
     static {
         OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -76,7 +83,7 @@ public class SubscriberClient {
             } catch (Exception e) {
                 return DeliveryResult.error(System.currentTimeMillis() - start, e.getMessage());
             }
-        });
+        }, DELIVERY_EXECUTOR);
     }
 
     /** Rebuild a CloudEvent from an envelope for subscriber delivery. */

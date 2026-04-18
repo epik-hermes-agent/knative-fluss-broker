@@ -7,7 +7,7 @@ package com.knative.fluss.broker.storage.fluss.tables;
  * <ul>
  *   <li>Database: {@code knative_{namespace}}</li>
  *   <li>Table: {@code broker_{brokerName}}</li>
- *   <li>DLQ Table: {@code dlq_{triggerName}}</li>
+ *   <li>DLQ Table: {@code dlq_{brokerName}_{triggerName}}</li>
  *   <li>Schema Registry Table: {@code schema_registry}</li>
  * </ul>
  */

@@ -126,11 +126,10 @@ public class TriggerDispatcher implements AutoCloseable {
                 }
 
                 // Distribute to lanes (round-robin, skip paused)
-                int matched = 0;
                 for (Envelope event : events) {
                     // Apply trigger filter
                     if (!EventFilter.matches(event, filterAttributes)) {
-                        continue; // Skip non-matching events — don't advance cursor past them
+                        continue; // Skip non-matching events
                     }
 
                     // Find an active lane (round-robin)
@@ -147,11 +146,12 @@ public class TriggerDispatcher implements AutoCloseable {
                         log.debug("All lanes full, will retry in next scan");
                         break;
                     }
-                    matched++;
                 }
 
-                // Advance cursor only for matched (and enqueued) events
-                scanner.advanceCursor(triggerKey, matched);
+                // Advance cursor by ALL events polled from Fluss, not just matched ones.
+                // The cursor tracks "events read" for observability. Fluss re-reads from the
+                // beginning on restart regardless — the cursor does not control resumption.
+                scanner.advanceCursor(triggerKey, events.size());
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
