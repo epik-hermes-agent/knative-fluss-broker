@@ -56,7 +56,7 @@ make docker-down            # Tear down containers + volumes
 
 **Iceberg Tiering** (optional):
 
-- Fluss 0.9.0 native tiering job (`fluss-flink-tiering`) scans old log segments and writes Parquet to S3/LocalStack
+- Fluss 1.0-SNAPSHOT native tiering job (`fluss-flink-tiering`) scans old log segments and writes Parquet to S3/LocalStack
 - Configured via `datalake.*` server properties — tables opt in with `table.datalake.enabled = 'true'`
 - Polaris REST catalog for Iceberg metadata (Apache Polaris 1.3.0-incubating, no Hive Metastore needed)
 - Plugins: `fluss-fs-s3` + `fluss-lake-iceberg` in `FLUSS_HOME/plugins/`
