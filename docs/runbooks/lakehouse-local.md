@@ -70,15 +70,33 @@ datalake.iceberg.s3.region: us-east-1
 
 ```sql
 -- Via Flink SQL Client (connected to Fluss catalog)
+-- Log table (append-only, no primary key) — matches our broker tables
 CREATE TABLE broker_events (
     event_id STRING,
+    event_source STRING,
     event_type STRING,
+    event_time TIMESTAMP(3),
+    content_type STRING,
     data BYTES,
-    PRIMARY KEY (event_id) NOT ENFORCED
+    schema_id INT,
+    schema_version INT,
+    attributes MAP<STRING, STRING>,
+    ingestion_time TIMESTAMP_LTZ(3),
+    ingestion_date DATE
 ) WITH (
     'table.datalake.enabled' = 'true',
     'table.datalake.freshness' = '30s'
 );
+```
+
+## Querying Tiered Data
+
+```sql
+-- Union read: Fluss hot data + Iceberg cold data (transparent merge)
+SELECT * FROM broker_events LIMIT 20;
+
+-- Iceberg-only read (bypasses Fluss)
+SELECT * FROM broker_events$lake LIMIT 20;
 ```
 
 ## Verifying Tiering

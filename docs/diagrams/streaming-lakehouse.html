@@ -134,7 +134,7 @@
         <!-- ═══ ICEBERG TIERING (BRIDGE) ═══ -->
         <rect x="400" y="280" width="280" height="120" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1.5"/>
         <text x="540" y="305" fill="white" font-size="12" font-weight="600" text-anchor="middle">Flink Tiering Job</text>
-        <text x="540" y="322" fill="#a78bfa" font-size="8" text-anchor="middle">fluss-flink-tiering-0.9.0-incubating.jar</text>
+        <text x="540" y="322" fill="#a78bfa" font-size="8" text-anchor="middle">fluss-flink-tiering-1.0-SNAPSHOT.jar</text>
         <line x1="420" y1="332" x2="660" y2="332" stroke="#a78bfa" stroke-width="0.5" opacity="0.3"/>
         <text x="420" y="350" fill="#94a3b8" font-size="8">1. Scan Fluss log tables</text>
         <text x="420" y="365" fill="#94a3b8" font-size="8">2. Convert to Iceberg GenericRecord</text>
@@ -181,7 +181,7 @@
         <text x="540" y="465" fill="white" font-size="13" font-weight="700" text-anchor="middle">UNION READ</text>
         <text x="540" y="485" fill="#94a3b8" font-size="9" text-anchor="middle">Fluss transparently combines hot + cold data</text>
         <text x="540" y="502" fill="#94a3b8" font-size="9" text-anchor="middle">for seamless queries across tiers</text>
-        <text x="540" y="522" fill="#34d399" font-size="8" text-anchor="middle">Flink SQL: SELECT * FROM fluss_table</text>
+        <text x="540" y="522" fill="#34d399" font-size="8" text-anchor="middle">SELECT * FROM fluss_table$lake  (Iceberg only)</text>
 
         <!-- Arrow: Fluss → Union Read -->
         <line x1="120" y1="390" x2="430" y2="480" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>

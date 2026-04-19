@@ -10,6 +10,8 @@ This project implements the [Knative Broker and Trigger](https://knative.dev/doc
 
 ```
 Producer → Ingress → Fluss Log Table → Trigger → Dispatcher → Subscriber
+                                              ↘ DLQ (on failure)
+                     Fluss Log Table ──→ Iceberg (cold tier, optional)
 ```
 
 Fluss replaces Kafka as the broker backend, giving you:
