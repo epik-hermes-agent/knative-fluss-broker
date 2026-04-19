@@ -27,9 +27,16 @@ Fluss replaces Kafka as the broker backend, giving you:
 # Run tests
 make test              # Unit tests (~15s)
 make test-integration  # Integration tests with docker-compose Fluss
-make test-e2e          # End-to-end data plane tests
+make test-e2e          # End-to-end data plane + Iceberg tiering tests
 make test-e2e-k8s      # Full K8s e2e (Kind + Knative + Fluss Helm)
+
+# Docker infrastructure
+make docker-up              # Basic Fluss cluster
+make docker-up-lakehouse    # Full lakehouse: Fluss + Flink + LocalStack + Polaris
+make docker-down            # Tear down containers + volumes
 ```
+
+> **E2E tests** require `make docker-up-lakehouse` first — they ingest CloudEvents, verify Fluss persistence, tier to Iceberg via the native tiering job, and query back with both union reads and `$lake`.
 
 ## How It Works
 
@@ -49,9 +56,12 @@ make test-e2e-k8s      # Full K8s e2e (Kind + Knative + Fluss Helm)
 
 **Iceberg Tiering** (optional):
 
-- Fluss's built-in tiering job scans old log segments and writes Parquet to S3/MinIO
+- Fluss 0.9.0 native tiering job (`fluss-flink-tiering`) scans old log segments and writes Parquet to S3/LocalStack
 - Configured via `datalake.*` server properties — tables opt in with `table.datalake.enabled = 'true'`
-- JDBC catalog on PostgreSQL for Iceberg metadata (no Hive Metastore needed)
+- Polaris REST catalog for Iceberg metadata (Apache Polaris 1.3.0-incubating, no Hive Metastore needed)
+- Plugins: `fluss-fs-s3` + `fluss-lake-iceberg` in `FLUSS_HOME/plugins/`
+- **Union reads** work for log tables (append-only): a regular query transparently merges Fluss hot data + Iceberg cold data into a single result set
+- `$lake` system table reads from Iceberg only (e.g. `SELECT * FROM broker_test$lake`)
 - Readable by Flink, Spark, and Trino
 
 ## Project Structure
