@@ -52,7 +52,7 @@ public class FlussZooKeeperCluster extends GenericContainer<FlussZooKeeperCluste
                 .withStartupTimeout(Duration.ofSeconds(60));
 
         // Fluss coordinator
-        this.coordinator = new GenericContainer<>(DockerImageName.parse("apache/fluss:0.9.0-incubating"))
+        this.coordinator = new GenericContainer<>(DockerImageName.parse("apache/fluss:1.0-SNAPSHOT"))
                 .withNetwork(network)
                 .withNetworkAliases("coordinator")
                 .withCommand("coordinatorServer")
@@ -65,7 +65,7 @@ public class FlussZooKeeperCluster extends GenericContainer<FlussZooKeeperCluste
                 .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(120)));
 
         // Fluss tablet server — needs ZK address and coordinator address
-        this.tabletServer = new GenericContainer<>(DockerImageName.parse("apache/fluss:0.9.0-incubating"))
+        this.tabletServer = new GenericContainer<>(DockerImageName.parse("apache/fluss:1.0-SNAPSHOT"))
                 .withNetwork(network)
                 .withNetworkAliases("tablet")
                 .withCommand("tabletServer")

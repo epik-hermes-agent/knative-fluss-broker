@@ -2,6 +2,9 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: brokers.eventing.fluss.io
+  labels:
+    app.kubernetes.io/name: knative-fluss-broker
+    app.kubernetes.io/part-of: knative-fluss-broker
 spec:
   group: eventing.fluss.io
   versions:
@@ -15,60 +18,58 @@ spec:
             spec:
               type: object
               properties:
-                config:
+                fluss:
                   type: object
+                  description: Fluss connection configuration
                   properties:
-                    fluss:
+                    endpoint:
+                      type: string
+                      description: "Fluss bootstrap server (e.g., fluss://fluss-release:9123)"
+                      default: "fluss://fluss-release:9123"
+                    writeBatchSize:
+                      type: integer
+                      default: 100
+                    writeBatchTimeoutMs:
+                      type: integer
+                      default: 50
+                    ackTimeoutMs:
+                      type: integer
+                      default: 10000
+                    writeMaxRetries:
+                      type: integer
+                      default: 3
+                    writeRetryBackoffMs:
+                      type: integer
+                      default: 100
+                ingress:
+                  type: object
+                  description: Ingress deployment configuration
+                  properties:
+                    replicas:
+                      type: integer
+                      minimum: 1
+                      maximum: 10
+                      default: 1
+                    resources:
                       type: object
                       properties:
-                        cluster:
-                          type: object
-                          properties:
-                            endpoint:
-                              type: string
-                              default: "fluss://fluss-cluster:9123"
-                    ingress:
-                      type: object
-                      properties:
-                        replicas:
-                          type: integer
-                          default: 1
-                        resources:
-                          type: object
-                          properties:
-                            requests:
-                              type: object
-                              properties:
-                                cpu:
-                                  type: string
-                                  default: "100m"
-                                memory:
-                                  type: string
-                                  default: "256Mi"
-                    schema:
-                      type: object
-                      properties:
-                        enabled:
-                          type: boolean
-                          default: true
-                        auto-register:
-                          type: boolean
-                          default: true
-                    iceberg:
-                      type: object
-                      properties:
-                        enabled:
-                          type: boolean
-                          default: false
-                        catalog-type:
+                        cpu:
                           type: string
-                          default: "hive"
-                        warehouse:
+                          default: "100m"
+                        memory:
                           type: string
-                          default: "s3a://iceberg-warehouse/"
-                        hive-endpoint:
-                          type: string
-                          default: "jdbc:postgresql://postgres:5432/iceberg"
+                          default: "256Mi"
+                schema:
+                  type: object
+                  description: Schema registry configuration
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    evolutionPolicy:
+                      type: string
+                      enum: [backward, forward, full, none]
+                      default: backward
             status:
               type: object
               properties:
@@ -84,6 +85,8 @@ spec:
                       reason:
                         type: string
                       message:
+                        type: string
+                      lastTransitionTime:
                         type: string
                 addresses:
                   type: array
@@ -101,7 +104,10 @@ spec:
       additionalPrinterColumns:
         - name: Ready
           type: string
-          jsonPath: .status.conditions[?(@.type=='Ready')].status
+          jsonPath: ".status.conditions[?(@.type=='Ready')].status"
+        - name: Address
+          type: string
+          jsonPath: ".status.addresses[0].url"
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -112,3 +118,7 @@ spec:
     kind: Broker
     shortNames:
       - fb
+    categories:
+      - all
+      - knative
+      - eventing

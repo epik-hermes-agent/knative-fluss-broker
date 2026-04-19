@@ -54,7 +54,7 @@ spec:
       # When enabled:
       # catalog-type: "hive"
       # warehouse: "s3a://warehouse/"
-      # catalog-uri: "jdbc:postgresql://postgres:5432/iceberg"
+      # catalog-uri: "http://polaris:8181/api/catalog"
 status:
   conditions:
     - type: Ready
@@ -180,7 +180,7 @@ BrokerReconciler.reconcile(Broker broker):
   |
   5. [If iceberg.enabled]
   |    - Ensure Iceberg tiering CronJob
-  |    - Configure JDBC catalog connection
+  |    - Configure Polaris REST catalog connection
   |    - Configure S3 credentials
   |
   6. Update Broker status

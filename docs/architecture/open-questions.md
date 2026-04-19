@@ -25,7 +25,7 @@ Known ambiguities and unresolved design decisions, documented per [§13 of the p
 - Namespace isolation gives one database per namespace
 - Multiple Brokers in the same namespace share a database but have separate tables
 - No cross-namespace event leakage is possible (different databases)
-- Table-level access control within a database is not enforced by Fluss in 0.9.0
+- Table-level access control within a database is not enforced by Fluss in 1.0-SNAPSHOT
 
 **Status**: Namespace-level isolation is acceptable for v1. Per-broker database isolation can be added if needed.
 
@@ -62,7 +62,7 @@ Known ambiguities and unresolved design decisions, documented per [§13 of the p
 **Context**: ADR 005 documents the hybrid consumer model — trusted internal consumers can read Fluss directly.
 
 **Open question**: What authentication/authorization model for direct Fluss readers?
-- Fluss 0.9.0 does not have built-in ACLs
+- Fluss 1.0-SNAPSHOT does not have built-in ACLs
 - Direct readers bypass Knative Trigger semantics (no filtering, no delivery tracking)
 - Should direct readers have a different Fluss user, or share the broker's connection?
 

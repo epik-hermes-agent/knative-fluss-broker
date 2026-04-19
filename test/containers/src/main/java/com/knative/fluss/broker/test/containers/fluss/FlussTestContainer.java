@@ -22,7 +22,7 @@ import java.time.Duration;
  */
 public class FlussTestContainer extends GenericContainer<FlussTestContainer> {
 
-    private static final DockerImageName IMAGE = DockerImageName.parse("apache/fluss:0.9.0-incubating");
+    private static final DockerImageName IMAGE = DockerImageName.parse("apache/fluss:1.0-SNAPSHOT");
     private static final int FLUSS_PORT = 9123;
 
     public FlussTestContainer() {

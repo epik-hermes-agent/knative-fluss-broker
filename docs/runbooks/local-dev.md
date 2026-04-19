@@ -28,14 +28,15 @@ make build
 ## Full Lakehouse Stack
 
 ```bash
-# Start everything including MinIO, PostgreSQL, Flink
+# Start everything including LocalStack, Polaris, Flink
 docker compose --profile lakehouse up -d
 
 # Run with Iceberg tests
 make test test-integration test-e2e
 
 # Access Flink UI: http://localhost:8081
-# Access MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+# Access LocalStack S3: http://localhost:4566
+# Access Polaris: http://localhost:8181
 ```
 
 ## K8s E2E (Kind + Knative + Fluss)
@@ -98,10 +99,9 @@ make kind-debug
 |---------|----------|---------|
 | Fluss | localhost:9123 | Event storage |
 | ZooKeeper | localhost:2181 | Fluss coordination |
-| MinIO | localhost:9000 | S3 API |
-| MinIO Console | localhost:9001 | S3 management |
+| LocalStack | localhost:4566 | S3 + STS + IAM |
+| Polaris | localhost:8181 | Iceberg REST catalog (lakehouse) |
 | Flink | localhost:8081 | Tiering services (lakehouse) |
-| PostgreSQL | localhost:5432 | JDBC catalog backend (lakehouse) |
 
 ## Useful Commands
 

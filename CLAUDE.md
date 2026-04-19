@@ -13,7 +13,7 @@ A Knative-native event broker backed by Apache Fluss for durable, low-latency ev
 
 - Java 21, Gradle 8.10+ (Kotlin DSL), Version Catalogs
 - Spring Boot 3.3.x (planned, not yet applied to modules)
-- Fluss 0.9.0-incubating, CloudEvents SDK 2.5, fabric8 6.13
+- Fluss 1.0-SNAPSHOT (locally built from main), CloudEvents SDK 2.5, fabric8 6.13
 - OkHttp for HTTP delivery, Jackson for JSON
 - Testcontainers, JUnit 5, AssertJ, Mockito, WireMock
 

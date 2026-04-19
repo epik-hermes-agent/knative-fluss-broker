@@ -2,6 +2,9 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: triggers.eventing.fluss.io
+  labels:
+    app.kubernetes.io/name: knative-fluss-broker
+    app.kubernetes.io/part-of: knative-fluss-broker
 spec:
   group: eventing.fluss.io
   versions:
@@ -14,44 +17,54 @@ spec:
           properties:
             spec:
               type: object
-              required: ["broker", "subscriber"]
+              required: [broker, subscriber]
               properties:
                 broker:
                   type: string
-                  description: "Name of the Broker this Trigger belongs to"
+                  description: "Name of the Broker this trigger belongs to"
                 filter:
                   type: object
+                  description: "CloudEvent attribute filters"
                   properties:
                     attributes:
                       type: object
                       additionalProperties:
                         type: string
-                      description: "CloudEvent attribute filters (exact match or prefix wildcard)"
+                      description: "Key-value pairs matching CloudEvent attributes (e.g., type, source)"
                 subscriber:
                   type: object
-                  required: ["uri"]
+                  required: [uri]
                   properties:
                     uri:
                       type: string
                       description: "Subscriber HTTP endpoint URI"
+                      pattern: "^https?://"
                     delivery:
                       type: object
+                      description: "Delivery retry configuration"
                       properties:
                         retry:
                           type: integer
+                          minimum: 0
+                          maximum: 100
                           default: 5
+                          description: "Max retry attempts"
                         backoffPolicy:
                           type: string
-                          default: "exponential"
-                          enum: ["exponential", "linear"]
+                          enum: [linear, exponential]
+                          default: exponential
+                          description: "Retry backoff strategy"
                         backoffDelay:
                           type: string
                           default: "PT1S"
+                          description: "Initial backoff delay (ISO 8601 duration)"
                         deadLetterSink:
                           type: object
+                          description: "Dead letter queue endpoint"
                           properties:
                             uri:
                               type: string
+                              pattern: "^https?://"
             status:
               type: object
               properties:
@@ -68,8 +81,12 @@ spec:
                         type: string
                       message:
                         type: string
+                      lastTransitionTime:
+                        type: string
                 observedGeneration:
                   type: integer
+                subscriberUri:
+                  type: string
       subresources:
         status: {}
       additionalPrinterColumns:
@@ -81,7 +98,7 @@ spec:
           jsonPath: .spec.subscriber.uri
         - name: Ready
           type: string
-          jsonPath: .status.conditions[?(@.type=='Ready')].status
+          jsonPath: ".status.conditions[?(@.type=='Ready')].status"
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -92,3 +109,7 @@ spec:
     kind: Trigger
     shortNames:
       - ft
+    categories:
+      - all
+      - knative
+      - eventing

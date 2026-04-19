@@ -118,7 +118,7 @@
 
         <!-- ═══ WARM TIER: REMOTE STORAGE ═══ -->
         <rect x="400" y="110" width="280" height="130" rx="8" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1.5"/>
-        <text x="540" y="135" fill="white" font-size="12" font-weight="600" text-anchor="middle">MinIO / S3</text>
+        <text x="540" y="135" fill="white" font-size="12" font-weight="600" text-anchor="middle">LocalStack / S3</text>
         <text x="540" y="158" fill="#fbbf24" font-size="9" font-weight="600" text-anchor="middle">remote.data.dir: s3://fluss-data</text>
         <line x1="420" y1="168" x2="660" y2="168" stroke="#fbbf24" stroke-width="0.5" opacity="0.3"/>
         <text x="420" y="186" fill="#94a3b8" font-size="8">• Historical log segments (Arrow IPC)</text>
@@ -166,13 +166,13 @@
         <line x1="680" y1="175" x2="748" y2="175" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
         <text x="714" y="168" fill="#fbbf24" font-size="8" text-anchor="middle">data files</text>
 
-        <!-- ═══ JDBC CATALOG ═══ -->
-        <rect x="750" y="310" width="310" height="70" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4"/>
-        <text x="905" y="335" fill="white" font-size="11" font-weight="600" text-anchor="middle">JDBC Catalog</text>
-        <text x="905" y="355" fill="#94a3b8" font-size="8" text-anchor="middle">PostgreSQL — schema, snapshots, metadata</text>
-        <text x="905" y="370" fill="#a78bfa" font-size="8" text-anchor="middle">datalake.iceberg.type: jdbc</text>
+<!-- ═══ POLARIS REST CATALOG ═══ -->
+        <rect x="780" y="310" width="250" height="100" rx="8" fill="rgba(67,56,202,0.2)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="905" y="335" fill="white" font-size="11" font-weight="600" text-anchor="middle">Polaris REST Catalog</text>
+        <text x="905" y="355" fill="#94a3b8" font-size="8" text-anchor="middle">Apache Polaris 1.3.0 — OAuth2 auth</text>
+        <text x="905" y="370" fill="#a78bfa" font-size="8" text-anchor="middle">datalake.iceberg.type: rest</text>
 
-        <!-- Arrow: Tiering → JDBC Catalog -->
+        <!-- Arrow: Tiering → Polaris REST Catalog -->
         <line x1="680" y1="340" x2="748" y2="340" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow-violet)"/>
         <text x="714" y="333" fill="#a78bfa" font-size="8" text-anchor="middle">commit</text>
 
@@ -226,7 +226,7 @@
         <text x="52" y="680" fill="#94a3b8" font-size="8">Fluss (Hot)</text>
 
         <rect x="30" y="688" width="16" height="10" rx="2" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
-        <text x="52" y="696" fill="#94a3b8" font-size="8">S3 / MinIO (Warm)</text>
+        <text x="52" y="696" fill="#94a3b8" font-size="8">S3 / LocalStack (Warm)</text>
 
         <rect x="30" y="704" width="16" height="10" rx="2" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
         <text x="52" y="712" fill="#94a3b8" font-size="8">Iceberg (Cold)</text>
@@ -280,7 +280,7 @@
           <li>• ACID transactions, time travel</li>
           <li>• Schema evolution support</li>
           <li>• Parquet columnar format</li>
-          <li>• JDBC catalog (PostgreSQL)</li>
+          <li>• Polaris REST catalog (Apache Polaris 1.3.0)</li>
           <li>• Readable by Spark, Trino, Flink</li>
         </ul>
       </div>

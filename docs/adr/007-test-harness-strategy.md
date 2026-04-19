@@ -19,7 +19,7 @@ We adopted a **layered test profile strategy** with three distinct modes:
 - All tests in this profile connect to `127.0.0.1:9123` (host-mapped Fluss port)
 
 ### 2. Full Lakehouse Profile (`--profile lakehouse`)
-- Testcontainers for MinIO
+- Testcontainers for LocalStack
 - Testcontainers for DebugFlussTest (ZooKeeper + Fluss spinup)
 - Docker Compose lakehouse services: PostgreSQL, Flink
 
@@ -35,7 +35,7 @@ We adopted a **layered test profile strategy** with three distinct modes:
 ### Why docker-compose for Fluss instead of Testcontainers?
 
 1. **Startup time**: Fluss requires ZooKeeper + Coordinator + Tablet server. Spinning these via Testcontainers on every test class adds 30-60s per test class. Docker Compose runs them once as shared infrastructure.
-2. **Fluss 0.9.0-incubating complexity**: The Fluss server needs specific `bind.listeners` / `advertised.listeners` / `internal.listener.name` configuration that is fragile to wire dynamically in Testcontainers environment variables.
+2. **Fluss 1.0-SNAPSHOT complexity**: The Fluss server needs specific `bind.listeners` / `advertised.listeners` / `internal.listener.name` configuration that is fragile to wire dynamically in Testcontainers environment variables.
 3. **Debuggability**: When tests fail, engineers can inspect the running Fluss cluster via `docker logs`, the Flink UI (port 8081), and MinIO console (port 9001) — all persistent across test runs.
 4. **Pragmatic CI**: The `scripts/bootstrap.sh` script starts the docker-compose stack, and CI runs `./gradlew build` against it. No per-test-container lifecycle management needed.
 
@@ -64,5 +64,5 @@ The `WireMockTestServer` in `test/wiremock/` uses WireMock standalone (not the T
 ## Related
 
 - ADR 001: Native Fluss Broker (why Fluss, not Kafka)
-- ADR 008: S3/Catalog Approach (MinIO + JDBC catalog for lakehouse profile)
+- ADR 008: S3/Catalog Approach (LocalStack + Polaris REST catalog for lakehouse profile)
 - §9 of project charter: Test Strategy

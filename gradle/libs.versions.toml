@@ -6,7 +6,7 @@ spring-boot = "3.3.5"
 spring-dependency-management = "1.1.6"
 
 # Event system
-fluss = "0.9.0-incubating"
+fluss = "1.0-SNAPSHOT"
 flink = "1.20.0"
 cloudevents = "2.5.0"
 
@@ -14,7 +14,6 @@ cloudevents = "2.5.0"
 fabric8 = "6.13.4"
 
 # Storage
-minio = "8.5.14"
 aws-sdk = "2.25.16"
 
 # HTTP
@@ -31,6 +30,7 @@ assertj = "3.26.3"
 mockito = "5.14.2"
 testcontainers = "1.21.4"
 wiremock = "3.9.1"
+awaitility = "4.2.2"
 
 # Misc
 slf4j = "2.0.16"
@@ -85,8 +85,8 @@ mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
-testcontainers-minio = { module = "org.testcontainers:minio", version.ref = "testcontainers" }
 wiremock = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
+awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 
 # Misc
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
@@ -95,7 +95,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 
 [bundles]
 cloudevents = ["cloudevents-api", "cloudevents-json-jackson", "cloudevents-http-basic"]
-testing-core = ["junit-jupiter-api", "junit-jupiter-params", "assertj-core", "mockito-core", "mockito-junit-jupiter"]
+testing-core = ["junit-jupiter-api", "junit-jupiter-params", "assertj-core", "mockito-core", "mockito-junit-jupiter", "awaitility"]
 testing-containers = ["testcontainers-junit-jupiter"]
 jackson = ["jackson-databind", "jackson-annotations", "jackson-datatype-jsr310"]
 

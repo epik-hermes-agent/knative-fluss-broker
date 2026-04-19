@@ -25,4 +25,8 @@ dependencies {
     
     // Jackson
     implementation(libs.bundles.jackson)
+
+    // Testing
+    testImplementation(libs.bundles.testing.core)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -1,7 +1,7 @@
 # ADR 008: S3-Compatible Storage and Iceberg Catalog Approach
 
 **Date:** 2026-04-17
-**Updated:** 2026-04-17 — Switched from HMS to JDBC catalog, aligned with Fluss quickstart
+**Updated:** 2026-04-18 — Switched from MinIO to LocalStack, from JDBC to Polaris REST catalog
 **Status:** Accepted
 **Deciders:** Project charter §3.8, §8.6, §9.5
 
@@ -13,7 +13,10 @@ The project includes Apache Iceberg integration in v1 as an optional/toggleable 
 
 For local development and CI, we need a self-contained setup that mirrors production behavior without requiring AWS accounts or external services.
 
-## Decision
+> **2026-04-18 Update:** The original MinIO + JDBC catalog choices below have been superseded.
+> See the [Updated Decisions](#updated-decisions-2026-04-18) section at the end.
+
+## Decision (Original — 2026-04-17)
 
 ### S3-Compatible Storage: MinIO (pgsty/minio)
 
@@ -88,7 +91,7 @@ Fluss uses a plugin system for extensibility. Required plugins for our setup:
 | `fluss-fs-s3` | `FLUSS_HOME/plugins/fluss-fs-s3/` | S3 filesystem for `remote.data.dir` |
 | `fluss-lake-iceberg` | `FLUSS_HOME/plugins/iceberg/` | Iceberg lake connector for `datalake.format: iceberg` |
 
-These plugins are downloaded by the `fluss-plugin-init` container and mounted into Fluss containers.
+These plugins are bundled in the Fluss Docker image and mounted via `fluss-plugins` volume for Hadoop client JARs.
 
 ## Consequences
 
@@ -101,3 +104,54 @@ These plugins are downloaded by the `fluss-plugin-init` container and mounted in
 - ADR 003: Iceberg Optional in v1
 - ADR 007: Test Harness Strategy (layered profiles)
 - §8.6 of project charter: Iceberg Integration Design
+
+## Updated Decisions (2026-04-18)
+
+### S3-Compatible Storage: LocalStack 4.6.0
+
+**Supersedes:** MinIO (pgsty/minio)
+
+**Rationale**:
+- LocalStack provides S3 + STS + IAM on a single port (4566)
+- Last free community edition (4.6.0) — no auth required
+- S3 operations work via `localstack:4566` with dummy credentials (`test`/`test`)
+- STS token delegation can now be redirected to LocalStack via `s3.assumed.role.sts.endpoint` (fixed in Fluss 1.0-SNAPSHOT, PR #3067)
+
+**Configuration pattern** (replaces MinIO):
+```yaml
+# Fluss S3 filesystem (remote.data.dir)
+s3.endpoint: http://localstack:4566
+s3.access-key: test
+s3.secret-key: test
+s3.region: us-east-1
+s3.path-style-access: true
+
+# Iceberg S3FileIO (datalake.iceberg.s3.*)
+datalake.iceberg.s3.endpoint: http://localstack:4566
+datalake.iceberg.s3.access-key-id: test
+datalake.iceberg.s3.secret-access-key: test
+datalake.iceberg.s3.path.style.access: "true"
+datalake.iceberg.s3.region: us-east-1
+```
+
+### Iceberg Catalog: Apache Polaris 1.3.0 REST Catalog
+
+**Supersedes:** JDBC catalog (PostgreSQL)
+
+**Rationale**:
+1. **Standards-compliant**: Polaris provides a full Iceberg REST catalog (`datalake.iceberg.type: rest`)
+2. **Simpler deployment**: Single container, no PostgreSQL database needed for catalog metadata
+3. **OAuth2 authentication**: Built-in security with bootstrap credentials
+4. **In-memory mode**: Perfect for dev/CI — no persistent state needed
+5. **Engine-agnostic**: Any Iceberg-compatible engine (Flink, Spark, Trino) can connect
+
+**Configuration pattern** (replaces JDBC):
+```yaml
+datalake.iceberg.type: rest
+datalake.iceberg.uri: http://polaris:8181/api/catalog
+datalake.iceberg.warehouse: fluss
+datalake.iceberg.credential: root:s3cr3t
+datalake.iceberg.scope: PRINCIPAL_ROLE:ALL
+```
+
+**Helm chart**: `apache-polaris/polaris` on ArtifactHub (for K8s deployment)

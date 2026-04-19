@@ -3,6 +3,7 @@ package com.knative.fluss.broker.storage.fluss.tables;
 import com.knative.fluss.broker.storage.fluss.client.FlussConnectionManager;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.metadata.DatabaseDescriptor;
+import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.types.DataTypes;
@@ -135,6 +136,16 @@ public class FlussTableManager {
                         .get(DDL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 ensuredTables.put(key, Boolean.TRUE);
                 log.info("Fluss broker table ensured: {}", key);
+                // Enable datalake tiering via alterTable (post-create, per Fluss docs)
+                try {
+                    admin.alterTable(flussPath,
+                            java.util.List.of(
+                                TableChange.set("table.datalake.enabled", "true")), true)
+                            .get(DDL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    log.info("Datalake enabled for table: {}", key);
+                } catch (Exception e) {
+                    log.warn("Could not enable datalake for table {}: {}", key, e.getMessage());
+                }
             } catch (ExecutionException e) {
                 if (isAlreadyExists(e)) {
                     ensuredTables.put(key, Boolean.TRUE);
@@ -273,7 +284,7 @@ public class FlussTableManager {
 
     /**
      * Build the schema for the broker event log table.
-     * In Fluss 0.9.0, columns are nullable by default.
+     * In Fluss 1.0-SNAPSHOT, columns are nullable by default.
      * Only columns that are part of the primary key are effectively NOT NULL.
      */
     private Schema buildBrokerTableSchema() {

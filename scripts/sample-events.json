@@ -1,0 +1,29 @@
+[
+  {
+    "type": "com.example.order.created",
+    "source": "/orders",
+    "data": {"orderId": "ord-001", "amount": 99.99, "currency": "USD", "customerId": "cust-42"}
+  },
+  {
+    "type": "com.example.order.created",
+    "source": "/orders",
+    "data": {"orderId": "ord-002", "amount": 249.50, "currency": "EUR", "customerId": "cust-17"},
+    "extensions": {"region": "eu-west-1", "priority": "high"}
+  },
+  {
+    "type": "com.example.user.signup",
+    "source": "/users",
+    "data": {"userId": "user-101", "email": "alice@example.com", "plan": "pro"}
+  },
+  {
+    "type": "com.example.payment.processed",
+    "source": "/payments",
+    "data": {"paymentId": "pay-555", "orderId": "ord-001", "status": "success", "method": "card"}
+  },
+  {
+    "type": "com.example.order.created",
+    "source": "/orders",
+    "data": {"orderId": "ord-003", "amount": 1299.00, "currency": "USD", "customerId": "cust-88"},
+    "extensions": {"region": "us-east-1"}
+  }
+]

@@ -11,39 +11,38 @@ import java.util.Map;
  *
  * @param enabled           Whether tiering is active (sets {@code table.datalake.enabled} on tables)
  * @param freshness         Tiering freshness interval (e.g., "30s", "5m")
- * @param catalogType       Catalog type: "hive", "hadoop", "jdbc", "rest"
+ * @param catalogType       Catalog type: "rest", "jdbc", "hive", "hadoop"
  * @param warehouse         Warehouse location (e.g., "s3a://iceberg-warehouse/")
- * @param hiveMetastoreUri  HMS/JDBC catalog URI
- * @param s3Endpoint        S3-compatible endpoint (e.g., "http://localhost:9000")
+ * @param catalogUri        Catalog URI (REST endpoint, JDBC URL, or HMS thrift URI)
+ * @param s3Endpoint        S3-compatible endpoint (e.g., "http://localhost:4566")
  * @param s3AccessKey       S3 access key
  * @param s3SecretKey       S3 secret key
- * @param jdbcUser          JDBC catalog username (used when catalogType is "jdbc")
- * @param jdbcPassword      JDBC catalog password (used when catalogType is "jdbc")
+ * @param catalogCredential Catalog credential for REST auth (e.g., "root:s3cr3t")
  */
 public record IcebergConfig(
     boolean enabled,
     String freshness,
     String catalogType,
     String warehouse,
-    String hiveMetastoreUri,
+    String catalogUri,
     String s3Endpoint,
     String s3AccessKey,
     String s3SecretKey,
-    String jdbcUser,
-    String jdbcPassword
+    String catalogCredential
 ) {
     /** Disabled by default — the system works correctly without Iceberg. */
     public static IcebergConfig disabled() {
         return new IcebergConfig(
-            false, "1m", "jdbc", "s3a://iceberg-warehouse/",
-            "jdbc:postgresql://localhost:5432/iceberg",
-            "http://localhost:9000", "minioadmin", "minioadmin",
-            "hive", "hive"
+            false, "1m", "rest", "s3a://iceberg-warehouse/",
+            "http://localhost:8181/api/catalog",
+            "http://localhost:4566", "test", "test",
+            "root:s3cr3t"
         );
     }
 
     /**
-     * Convert to Fluss server {@code FLUSS_PROPERTIES} format.
+     * Convert to Fluss {@code datalake.*} properties map.
+     * Matches the FLUSS_PROPERTIES format.
      * Used for programmatic config generation in docker-compose and tests.
      */
     public Map<String, String> toFlussProperties() {
@@ -56,12 +55,13 @@ public record IcebergConfig(
         props.put("datalake.iceberg.s3.secret-access-key", s3SecretKey);
         props.put("datalake.iceberg.s3.path.style.access", "true");
 
-        if ("hive".equalsIgnoreCase(catalogType)) {
-            props.put("datalake.iceberg.uri", hiveMetastoreUri);
+        if ("rest".equalsIgnoreCase(catalogType)) {
+            props.put("datalake.iceberg.uri", catalogUri);
+            props.put("datalake.iceberg.credential", catalogCredential);
+        } else if ("hive".equalsIgnoreCase(catalogType)) {
+            props.put("datalake.iceberg.uri", catalogUri);
         } else if ("jdbc".equalsIgnoreCase(catalogType)) {
-            props.put("datalake.iceberg.uri", hiveMetastoreUri);
-            props.put("datalake.iceberg.jdbc.user", jdbcUser);
-            props.put("datalake.iceberg.jdbc.password", jdbcPassword);
+            props.put("datalake.iceberg.uri", catalogUri);
         }
 
         return props;

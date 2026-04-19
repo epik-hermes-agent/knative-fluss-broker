@@ -66,7 +66,7 @@ make test test-integration
 ```
 
 ### Lakehouse Profile
-Full stack including Flink, MinIO, PostgreSQL.
+Full stack including Flink, LocalStack, Polaris.
 
 ```bash
 docker compose --profile lakehouse up -d
@@ -85,9 +85,9 @@ make test-e2e-k8s
 | Container | Purpose |
 |-----------|---------|
 | Fluss | Event storage integration |
-| MinIO | S3-compatible storage for Iceberg |
+| LocalStack | S3-compatible storage for Iceberg |
 | WireMock | HTTP subscriber stubs |
-| PostgreSQL | JDBC catalog backend (lakehouse) |
+| Polaris | Iceberg REST catalog (lakehouse) |
 
 ## WireMock Scenarios
 

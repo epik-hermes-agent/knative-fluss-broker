@@ -47,11 +47,11 @@ public class BrokerReconciler {
         log.info("Reconciling Broker {}/{}", namespace, name);
 
         try {
-            // Step 1: Ensure Fluss database
-            tableManager.ensureDatabase(namespace);
+            // Step 1: Ensure Fluss database (matches FlussTablePath convention: knative_{namespace})
+            FlussTablePath tablePath = FlussTablePath.brokerTable(namespace, name);
+            tableManager.ensureDatabase(tablePath.database());
 
             // Step 2: Ensure Fluss log table
-            FlussTablePath tablePath = FlussTablePath.brokerTable(namespace, name);
             tableManager.ensureBrokerTable(tablePath);
 
             // Step 3: Ensure ingress deployment

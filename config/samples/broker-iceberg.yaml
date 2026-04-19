@@ -24,7 +24,7 @@ spec:
   #
   # Server-side config in docker-compose.yml:
   #   datalake.format: iceberg
-  #   datalake.iceberg.type: jdbc
-  #   datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
-  #   datalake.iceberg.warehouse: s3a://iceberg-warehouse/
-  #   datalake.iceberg.s3.endpoint: http://minio:9000
+  #   datalake.iceberg.type: rest
+  #   datalake.iceberg.uri: http://polaris:8181/api/catalog
+  #   datalake.iceberg.warehouse: fluss
+  #   datalake.iceberg.s3.endpoint: http://localstack:4566

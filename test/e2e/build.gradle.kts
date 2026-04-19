@@ -18,7 +18,6 @@ dependencies {
     testImplementation(libs.mockito.junit.jupiter)
     testImplementation(libs.bundles.testing.containers)
     testImplementation(libs.okhttp.mockwebserver)
-    testImplementation(libs.testcontainers.minio)
-    
+
     testRuntimeOnly(libs.logback.classic)
 }

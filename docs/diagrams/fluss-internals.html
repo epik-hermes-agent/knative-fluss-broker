@@ -140,7 +140,7 @@
 
         <!-- ═══ REMOTE STORAGE (S3) ═══ -->
         <rect x="420" y="520" width="270" height="90" rx="8" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1.5"/>
-        <text x="555" y="545" fill="white" font-size="11" font-weight="600" text-anchor="middle">Remote Storage (S3/MinIO)</text>
+        <text x="555" y="545" fill="white" font-size="11" font-weight="600" text-anchor="middle">Remote Storage (S3/LocalStack)</text>
         <text x="555" y="563" fill="#fbbf24" font-size="8" text-anchor="middle">remote.data.dir: s3://fluss-data</text>
         <text x="555" y="580" fill="#94a3b8" font-size="8" text-anchor="middle">• Tiered log segments (Arrow IPC)</text>
         <text x="555" y="596" fill="#94a3b8" font-size="8" text-anchor="middle">• KvStore snapshots (RocksDB SST)</text>
@@ -166,7 +166,7 @@
         <text x="70" y="452" fill="#94a3b8" font-size="8">1. Scan Fluss log tables</text>
         <text x="70" y="468" fill="#94a3b8" font-size="8">2. Convert to Iceberg records</text>
         <text x="70" y="484" fill="#94a3b8" font-size="8">3. Write Parquet to S3</text>
-        <text x="70" y="500" fill="#94a3b8" font-size="8">4. Commit to JDBC catalog</text>
+        <text x="70" y="500" fill="#94a3b8" font-size="8">4. Commit to Polaris REST catalog</text>
         <text x="70" y="520" fill="#a78bfa" font-size="8">table.datalake.enabled = true</text>
         <text x="70" y="536" fill="#64748b" font-size="7">currently: Paimon (Iceberg: 0.9.0)</text>
 

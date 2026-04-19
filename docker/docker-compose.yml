@@ -1,31 +1,51 @@
 # Docker Compose for local development and integration testing.
-# Brings up: ZooKeeper, Fluss, MinIO, Flink (for tiering), PostgreSQL (Iceberg catalog).
+# Brings up: ZooKeeper, Fluss, LocalStack (S3+STS), Flink (for tiering), Polaris (Iceberg catalog).
 #
 # Usage:
-#   docker compose up -d                                    # Core services (Fluss + ZK + MinIO)
+#   docker compose up -d                                    # Core services (Fluss + ZK + LocalStack)
 #   docker compose --profile lakehouse up -d                # Full lakehouse stack (Flink + tiering)
 #   docker compose down -v                                  # Tear down + remove volumes
 #
-# Fluss 0.9.0-incubating requires dual listeners:
-#   INTERNAL — server-to-server (coordinator ↔ tablet) via Docker network
-#   CLIENT   — external clients (our Java code on the host)
-#   advertised.listeners tells external clients the host-mapped address.
+# Fluss 1.0-SNAPSHOT (locally built from apache/fluss main, commit a0260f4).
+# Plugins (fluss-fs-s3, fluss-lake-iceberg) are baked into the image — no plugin-init needed.
+#
+# S3 STS: Uses s3.assumed.role.sts.endpoint to direct STS calls to LocalStack
+# instead of AWS. The $lake system table is Fluss's standard API for querying
+# Iceberg-tiered data.
 #
 # Iceberg tiering uses Fluss's BUILT-IN lake connector (fluss-lake-iceberg plugin)
 # and pre-built Flink job (fluss-flink-tiering JAR). No custom tiering code.
 #
-# JAR placement follows the official Fluss Iceberg quickstart:
-#   FLUSS_HOME/plugins/fluss-fs-s3/   — S3 filesystem plugin (Fluss remote.data.dir)
-#   FLUSS_HOME/plugins/iceberg/       — Iceberg lake connector plugin
-#   FLINK_HOME/lib/                   — fluss-flink, iceberg-runtime, hadoop, iceberg-aws
-#   FLINK_HOME/opt/                   — fluss-flink-tiering (submitted as Flink job)
-# Storage: local disk (data.dir) + MinIO/S3 (remote.data.dir + Iceberg warehouse)
+# Flink tiering JARs are bind-mounted from local Fluss build at:
+#   /Users/pasha/hermes/fluss-main/
 
 networks:
   fluss-net:
     driver: bridge
 
 services:
+  # ──────────────────────────────────────────────
+  # Fluss Dependency Init — downloads Hadoop JARs needed by Iceberg plugin
+  # (not bundled in the Fluss 1.0-SNAPSHOT image)
+  # ──────────────────────────────────────────────
+  fluss-dep-init:
+    image: apache/fluss:1.0-SNAPSHOT
+    container_name: fluss-dep-init
+    user: root
+    networks:
+      - fluss-net
+    volumes:
+      - fluss-plugins:/staging
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Copy ALL built-in plugins from the image to the staging volume
+        cp -r /opt/fluss/plugins/* /staging/
+        # Add Hadoop JARs needed by Iceberg plugin (not bundled in the image)
+        curl -fL -o /staging/iceberg/hadoop-client-api-3.3.5.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-api/3.3.5/hadoop-client-api-3.3.5.jar
+        curl -fL -o /staging/iceberg/hadoop-client-runtime-3.3.5.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-runtime/3.3.5/hadoop-client-runtime-3.3.5.jar
+        echo 'Fluss plugins ready:' && find /staging -name "*.jar" | sort
+
   # ──────────────────────────────────────────────
   # ZooKeeper (required by Fluss)
   # ──────────────────────────────────────────────
@@ -48,114 +68,109 @@ services:
       retries: 5
 
   # ──────────────────────────────────────────────
-  # Fluss Plugin Init — downloads required plugins
-  # for Fluss containers (S3 filesystem + Iceberg lake connector)
-  # ──────────────────────────────────────────────
-  fluss-plugin-init:
-    image: curlimages/curl:latest
-    container_name: fluss-plugin-init
-    networks:
-      - fluss-net
-    volumes:
-      - fluss-plugins:/plugins
-    entrypoint: >
-      /bin/sh -c "
-        echo 'Downloading Fluss plugins...';
-        # S3 filesystem plugin (for remote.data.dir: s3://...)
-        mkdir -p /plugins/fluss-fs-s3;
-        curl -fL -o /plugins/fluss-fs-s3/fluss-fs-s3-0.9.0-incubating.jar
-          https://repo1.maven.org/maven2/org/apache/fluss/fluss-fs-s3/0.9.0-incubating/fluss-fs-s3-0.9.0-incubating.jar;
-        # Iceberg lake connector plugin (for datalake.format: iceberg)
-        mkdir -p /plugins/iceberg;
-        curl -fL -o /plugins/iceberg/fluss-lake-iceberg-0.9.0-incubating.jar
-          https://repo1.maven.org/maven2/org/apache/fluss/fluss-lake-iceberg/0.9.0-incubating/fluss-lake-iceberg-0.9.0-incubating.jar;
-        echo 'All Fluss plugins downloaded';
-        ls -laR /plugins/;
-      "
-    profiles:
-      - lakehouse
-
-  # ──────────────────────────────────────────────
   # Apache Fluss Coordinator Server
+  # Two listeners:
+  #   INTERNAL (port 9125) — for tablet servers and tiering job inside Docker
+  #   CLIENT   (port 9123) — for host-side Java clients
   # ──────────────────────────────────────────────
   fluss-coordinator:
-    image: apache/fluss:0.9.0-incubating
+    image: apache/fluss:1.0-SNAPSHOT
     container_name: fluss-coordinator
     command: coordinatorServer
     networks:
       - fluss-net
     ports:
-      - "9123:9123"   # Fluss client port (host:container)
+      - "9123:9123"   # CLIENT listener for host
+      - "9125:9125"   # INTERNAL listener for Docker network
     environment:
       FLUSS_PROPERTIES: |
         zookeeper.address: zookeeper:2181
-        bind.listeners: INTERNAL://fluss-coordinator:0, CLIENT://fluss-coordinator:9123
-        advertised.listeners: CLIENT://localhost:9123
+        bind.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://fluss-coordinator:9123
+        advertised.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://localhost:9123
         internal.listener.name: INTERNAL
         data.dir: /tmp/fluss-data
-        # Fluss tiered storage (log segments offloaded to S3 via fluss-fs-s3 plugin)
         remote.data.dir: s3://fluss-data/remote
-        s3.endpoint: http://minio:9000
-        s3.access-key: minioadmin
-        s3.secret-key: minioadmin
+        s3.endpoint: http://localstack:4566
+        s3.access-key: test
+        s3.secret-key: test
         s3.region: us-east-1
         s3.path-style-access: true
-        # Iceberg datalake config (native Fluss tiering via lake connector plugin)
+        s3.assumed.role.arn: arn:aws:iam::000000000000:role/fluss-delegation
+        s3.assumed.role.sts.endpoint: http://localstack:4566
         datalake.format: iceberg
-        datalake.iceberg.type: jdbc
-        datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
-        datalake.iceberg.jdbc.user: iceberg
-        datalake.iceberg.jdbc.password: iceberg
-        datalake.iceberg.warehouse: s3a://iceberg-warehouse/
-        datalake.iceberg.s3.endpoint: http://minio:9000
-        datalake.iceberg.s3.access-key-id: minioadmin
-        datalake.iceberg.s3.secret-access-key: minioadmin
+        datalake.freshness: 10s
+        datalake.iceberg.type: rest
+        datalake.iceberg.uri: http://polaris:8181/api/catalog
+        datalake.iceberg.warehouse: fluss
+        datalake.iceberg.credential: root:s3cr3t
+        datalake.iceberg.scope: PRINCIPAL_ROLE:ALL
+        datalake.iceberg.s3.endpoint: http://localstack:4566
+        datalake.iceberg.s3.access-key-id: test
+        datalake.iceberg.s3.secret-access-key: test
         datalake.iceberg.s3.path.style.access: "true"
+        datalake.iceberg.s3.region: us-east-1
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     depends_on:
+      fluss-dep-init:
+        condition: service_completed_successfully
       zookeeper:
         condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+      polaris-setup:
+        condition: service_completed_successfully
     volumes:
       - fluss-coordinator-data:/data
       - fluss-plugins:/opt/fluss/plugins:ro
 
   # ──────────────────────────────────────────────
   # Apache Fluss Tablet Server
+  # Connects to coordinator via INTERNAL listener
   # ──────────────────────────────────────────────
   fluss-tablet:
-    image: apache/fluss:0.9.0-incubating
+    image: apache/fluss:1.0-SNAPSHOT
     container_name: fluss-tablet
     command: tabletServer
     networks:
       - fluss-net
     ports:
-      - "9124:9123"   # Fluss tablet client port (host 9124 → container 9123)
+      - "9126:9123"   # CLIENT listener for host clients
     environment:
       FLUSS_PROPERTIES: |
         zookeeper.address: zookeeper:2181
-        bind.listeners: INTERNAL://fluss-tablet:0, CLIENT://fluss-tablet:9123
-        advertised.listeners: CLIENT://localhost:9124
+        bind.listeners: INTERNAL://fluss-tablet:9124, CLIENT://fluss-tablet:9123
+        advertised.listeners: INTERNAL://fluss-tablet:9124, CLIENT://localhost:9126
         internal.listener.name: INTERNAL
         tablet-server.id: 0
         data.dir: /tmp/fluss-data
-        # Fluss tiered storage (same as coordinator)
         remote.data.dir: s3://fluss-data/remote
-        s3.endpoint: http://minio:9000
-        s3.access-key: minioadmin
-        s3.secret-key: minioadmin
+        s3.endpoint: http://localstack:4566
+        s3.access-key: test
+        s3.secret-key: test
         s3.region: us-east-1
         s3.path-style-access: true
-        # Iceberg datalake config (same as coordinator)
+        s3.assumed.role.arn: arn:aws:iam::000000000000:role/fluss-delegation
+        s3.assumed.role.sts.endpoint: http://localstack:4566
         datalake.format: iceberg
-        datalake.iceberg.type: jdbc
-        datalake.iceberg.uri: jdbc:postgresql://postgres:5432/iceberg
-        datalake.iceberg.jdbc.user: iceberg
-        datalake.iceberg.jdbc.password: iceberg
-        datalake.iceberg.warehouse: s3a://iceberg-warehouse/
-        datalake.iceberg.s3.endpoint: http://minio:9000
-        datalake.iceberg.s3.access-key-id: minioadmin
-        datalake.iceberg.s3.secret-access-key: minioadmin
+        datalake.freshness: 10s
+        datalake.iceberg.type: rest
+        datalake.iceberg.uri: http://polaris:8181/api/catalog
+        datalake.iceberg.warehouse: fluss
+        datalake.iceberg.credential: root:s3cr3t
+        datalake.iceberg.scope: PRINCIPAL_ROLE:ALL
+        datalake.iceberg.s3.endpoint: http://localstack:4566
+        datalake.iceberg.s3.access-key-id: test
+        datalake.iceberg.s3.secret-access-key: test
         datalake.iceberg.s3.path.style.access: "true"
+        datalake.iceberg.s3.region: us-east-1
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     depends_on:
+      fluss-dep-init:
+        condition: service_completed_successfully
       fluss-coordinator:
         condition: service_started
     volumes:
@@ -163,104 +178,121 @@ services:
       - fluss-plugins:/opt/fluss/plugins:ro
 
   # ──────────────────────────────────────────────
-  # MinIO (S3-compatible storage)
+  # LocalStack (S3 + STS)
+  # S3 on port 4566 + STS on same port
+  # Using 4.6.0 (last free community edition, no auth required)
   # ──────────────────────────────────────────────
-  minio:
-    image: pgsty/minio
-    container_name: fluss-minio
+  localstack:
+    image: localstack/localstack:4.6.0
+    container_name: fluss-localstack
     networks:
       - fluss-net
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Console
+      - "4566:4566"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+      SERVICES: s3,sts,iam
+      DEFAULT_REGION: us-east-1
     volumes:
-      - minio-data:/data
+      - localstack-data:/var/lib/localstack
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\"'"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # Create required buckets on startup
-  minio-init:
-    image: pgsty/mc
-    container_name: fluss-minio-init
+  localstack-init:
+    image: localstack/localstack:4.6.0
+    container_name: fluss-localstack-init
     networks:
       - fluss-net
     depends_on:
-      minio:
+      localstack:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb --ignore-existing local/iceberg-warehouse;
-      mc mb --ignore-existing local/fluss-data;
-      echo 'MinIO buckets created: iceberg-warehouse, fluss-data';
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        export AWS_ENDPOINT_URL=http://localstack:4566
+        # Clean up stale Iceberg data from previous runs (prevents table ID mismatch)
+        awslocal s3 rm s3://iceberg-warehouse/ --recursive 2>/dev/null || true
+        # Create S3 buckets
+        awslocal s3 mb s3://fluss-data
+        awslocal s3 mb s3://iceberg-warehouse
+        echo "LocalStack init complete: buckets created, stale data cleaned"
 
   # ──────────────────────────────────────────────
-  # PostgreSQL (Iceberg JDBC catalog backend)
+  # Apache Polaris — Iceberg REST Catalog (in-memory mode)
   # ──────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: fluss-postgres
+  polaris:
+    image: apache/polaris:1.3.0-incubating
+    container_name: polaris
     networks:
       - fluss-net
     ports:
-      - "5432:5432"
+      - "8181:8181"
     environment:
-      POSTGRES_USER: iceberg
-      POSTGRES_PASSWORD: iceberg
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh
-    profiles:
-      - lakehouse
+      # Bootstrap credentials (realm, clientId, clientSecret)
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
+      # Realms
+      POLARIS_REALM_CONTEXT_REALMS: POLARIS
+      POLARIS_DEFAULT_REALM: POLARIS
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -X POST http://localhost:8181/api/catalog/v1/oauth/tokens -d 'grant_type=client_credentials&client_id=root&client_secret=s3cr3t&scope=PRINCIPAL_ROLE:ALL' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
 
   # ──────────────────────────────────────────────
-  # Flink Init — downloads required JARs for tiering
+  # Polaris Bootstrap — creates catalog + namespace
+  # ──────────────────────────────────────────────
+  polaris-setup:
+    image: alpine:3.19
+    container_name: polaris-setup
+    networks:
+      - fluss-net
+    depends_on:
+      polaris:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache curl;
+        /scripts/polaris-setup.sh;
+    volumes:
+      - ./polaris-setup.sh:/scripts/polaris-setup.sh:ro
+
+  # ──────────────────────────────────────────────
+  # Flink Init — downloads non-Fluss JARs from Maven Central.
+  # Fluss JARs (fluss-flink-1.20, fluss-lake-iceberg, fluss-flink-tiering)
+  # are bind-mounted from local build into flink-lib and flink-opt volumes.
   # ──────────────────────────────────────────────
   flink-init:
-    image: flink:1.20-java21
+    image: flink:1.20.3-scala_2.12-java17
     container_name: fluss-flink-init
     networks:
       - fluss-net
     volumes:
       - flink-lib:/opt/flink/lib
       - flink-opt:/opt/flink/opt
-    entrypoint: >
-      /bin/sh -c "
-        echo 'Downloading Fluss + Iceberg JARs for tiering...';
-        # Fluss Flink connector (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/fluss-flink-1.20-0.9.0-incubating.jar
-          https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-1.20/0.9.0-incubating/fluss-flink-1.20-0.9.0-incubating.jar;
-        # Fluss Iceberg lake connector (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/fluss-lake-iceberg-0.9.0-incubating.jar
-          https://repo1.maven.org/maven2/org/apache/fluss/fluss-lake-iceberg/0.9.0-incubating/fluss-lake-iceberg-0.9.0-incubating.jar;
-        # Iceberg Flink runtime (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/iceberg-flink-runtime-1.20-1.10.1.jar
-          https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.10.1/iceberg-flink-runtime-1.20-1.10.1.jar;
-        # Iceberg AWS bundle — S3 support (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/iceberg-aws-bundle-1.10.1.jar
-          https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar;
-        # Hadoop client — required by Iceberg (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/hadoop-client-api-3.3.5.jar
-          https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-api/3.3.5/hadoop-client-api-3.3.5.jar;
-        curl -fL -o /opt/flink/lib/hadoop-client-runtime-3.3.5.jar
-          https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-runtime/3.3.5/hadoop-client-runtime-3.3.5.jar;
-        # PostgreSQL JDBC driver — for JDBC catalog (FLINK_HOME/lib)
-        curl -fL -o /opt/flink/lib/postgresql-42.7.4.jar
-          https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar;
-        # Fluss tiering service — the pre-built Flink job (FLINK_HOME/opt)
-        curl -fL -o /opt/flink/opt/fluss-flink-tiering-0.9.0-incubating.jar
-          https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-tiering/0.9.0-incubating/fluss-flink-tiering-0.9.0-incubating.jar;
-        echo 'All tiering JARs downloaded successfully';
-        ls -lh /opt/flink/lib/*.jar /opt/flink/opt/*.jar;
-      "
+      - /Users/pasha/hermes/fluss-main/fluss-flink/fluss-flink-1.20/target/fluss-flink-1.20-1.0-SNAPSHOT.jar:/staging/fluss-flink-1.20.jar:ro
+      - /Users/pasha/hermes/fluss-main/fluss-lake/fluss-lake-iceberg/target/fluss-lake-iceberg-1.0-SNAPSHOT.jar:/staging/fluss-lake-iceberg.jar:ro
+      - /Users/pasha/hermes/fluss-main/fluss-flink/fluss-flink-tiering/target/fluss-flink-tiering-1.0-SNAPSHOT.jar:/staging/fluss-flink-tiering.jar:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Copy Fluss JARs from bind mounts to shared volumes
+        cp /staging/fluss-flink-1.20.jar /opt/flink/lib/fluss-flink-1.20-1.0-SNAPSHOT.jar
+        cp /staging/fluss-lake-iceberg.jar /opt/flink/lib/fluss-lake-iceberg-1.0-SNAPSHOT.jar
+        cp /staging/fluss-flink-tiering.jar /opt/flink/opt/fluss-flink-tiering-1.0-SNAPSHOT.jar
+        # Download non-Fluss dependencies from Maven Central
+        curl -fL -o /opt/flink/lib/iceberg-flink-runtime-1.20-1.10.1.jar https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.10.1/iceberg-flink-runtime-1.20-1.10.1.jar
+        curl -fL -o /opt/flink/lib/iceberg-aws-bundle-1.10.1.jar https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar
+        curl -fL -o /opt/flink/lib/hadoop-client-api-3.3.5.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-api/3.3.5/hadoop-client-api-3.3.5.jar
+        curl -fL -o /opt/flink/lib/hadoop-client-runtime-3.3.5.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-runtime/3.3.5/hadoop-client-runtime-3.3.5.jar
+        echo "Flink JARs ready:" && ls -lh /opt/flink/lib/*.jar /opt/flink/opt/*.jar
     profiles:
       - lakehouse
 
@@ -268,17 +300,20 @@ services:
   # Flink JobManager
   # ──────────────────────────────────────────────
   flink-jobmanager:
-    image: flink:1.20-java21
+    image: flink:1.20.3-scala_2.12-java17
     container_name: fluss-flink-jobmanager
     networks:
       - fluss-net
     ports:
-      - "8081:8081"   # Flink Web UI
+      - "8081:8081"
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         state.backend: hashmap
         state.checkpoints.dir: file:///tmp/flink-checkpoints
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     command: jobmanager
     depends_on:
       flink-init:
@@ -293,7 +328,7 @@ services:
   # Flink TaskManager
   # ──────────────────────────────────────────────
   flink-taskmanager:
-    image: flink:1.20-java21
+    image: flink:1.20.3-scala_2.12-java17
     container_name: fluss-flink-taskmanager
     networks:
       - fluss-net
@@ -302,6 +337,9 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         state.backend: hashmap
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     command: taskmanager
     depends_on:
       flink-jobmanager:
@@ -314,11 +352,11 @@ services:
 
   # ──────────────────────────────────────────────
   # Tiering Job Submission (one-shot)
-  # Submits Fluss's built-in fluss-flink-tiering job to the Flink cluster.
-  # The job continuously tiers data from Fluss log tables to Iceberg.
+  # Connects to Fluss via INTERNAL listener (fluss-coordinator:9125)
+  # so the advertised address is reachable from inside Docker.
   # ──────────────────────────────────────────────
   flink-tiering-submit:
-    image: flink:1.20-java21
+    image: flink:1.20.3-scala_2.12-java17
     container_name: fluss-flink-tiering-submit
     networks:
       - fluss-net
@@ -331,29 +369,30 @@ services:
         condition: service_started
       fluss-tablet:
         condition: service_started
+      polaris:
+        condition: service_healthy
     volumes:
       - flink-lib:/opt/flink/lib:ro
       - flink-opt:/opt/flink/opt:ro
-    entrypoint: >
-      /bin/sh -c "
-        echo 'Waiting for Flink cluster and Fluss to be ready...';
-        sleep 20;
-        echo 'Submitting Fluss Iceberg tiering job...';
-        /opt/flink/bin/flink run -d /opt/flink/opt/fluss-flink-tiering-0.9.0-incubating.jar \
-          --fluss.bootstrap.servers fluss-coordinator:9123 \
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 25;
+        /opt/flink/bin/flink run -d -m flink-jobmanager:8081 /opt/flink/opt/fluss-flink-tiering-1.0-SNAPSHOT.jar \
+          --fluss.bootstrap.servers fluss-coordinator:9125 \
           --datalake.format iceberg \
-          --datalake.iceberg.type jdbc \
-          --datalake.iceberg.uri jdbc:postgresql://postgres:5432/iceberg \
-          --datalake.iceberg.jdbc.user iceberg \
-          --datalake.iceberg.jdbc.password iceberg \
-          --datalake.iceberg.warehouse s3a://iceberg-warehouse/ \
-          --datalake.iceberg.s3.endpoint http://minio:9000 \
-          --datalake.iceberg.s3.access-key-id minioadmin \
-          --datalake.iceberg.s3.secret-access-key minioadmin \
+          --datalake.iceberg.type rest \
+          --datalake.iceberg.uri http://polaris:8181/api/catalog \
+          --datalake.iceberg.warehouse fluss \
+          --datalake.iceberg.credential root:s3cr3t \
+          --datalake.iceberg.scope PRINCIPAL_ROLE:ALL \
+          --datalake.iceberg.s3.endpoint http://localstack:4566 \
+          --datalake.iceberg.s3.access-key-id test \
+          --datalake.iceberg.s3.secret-access-key test \
           --datalake.iceberg.s3.path.style.access true \
-          --execution.checkpointing.interval 30s;
+          --datalake.iceberg.s3.region us-east-1 \
+          --execution.checkpointing.interval 10s;
         echo 'Tiering job submitted';
-      "
     profiles:
       - lakehouse
 
@@ -362,7 +401,6 @@ volumes:
   fluss-coordinator-data:
   fluss-tablet-data:
   fluss-plugins:
-  minio-data:
-  postgres-data:
+  localstack-data:
   flink-lib:
   flink-opt:

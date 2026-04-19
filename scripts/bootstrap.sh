@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./scripts/bootstrap.sh              # Full setup (Docker + build)
-#   ./scripts/bootstrap.sh --core       # Core services only (Fluss + ZK + MinIO)
+#   ./scripts/bootstrap.sh --core       # Core services only (Fluss + ZK + LocalStack)
 #   ./scripts/bootstrap.sh --lakehouse  # Full lakehouse stack
 #   ./scripts/bootstrap.sh --with-tests # Run tests after setup
 #
@@ -67,11 +67,11 @@ start_services() {
     cd "$PROJECT_DIR"
 
     if [ "$profile" = "lakehouse" ]; then
-        info "Starting full lakehouse stack (Fluss + ZK + MinIO + PostgreSQL + Flink + tiering)..."
+        info "Starting full lakehouse stack (Fluss + ZK + LocalStack + Polaris + Flink + tiering)..."
         docker compose -f docker/docker-compose.yml --profile lakehouse up -d
     else
-        info "Starting core services (Fluss + ZK + MinIO)..."
-        docker compose -f docker/docker-compose.yml up -d fluss-coordinator fluss-tablet zookeeper minio minio-init
+        info "Starting core services (Fluss + ZK + LocalStack)..."
+        docker compose -f docker/docker-compose.yml up -d fluss-coordinator fluss-tablet zookeeper localstack localstack-init
     fi
 
     # Wait for Fluss coordinator to be ready
@@ -153,10 +153,10 @@ main() {
     info ""
     info "=== Setup complete! ==="
     info "Fluss coordinator: fluss://127.0.0.1:9123"
-    info "MinIO console:     http://localhost:9001 (minioadmin/minioadmin)"
+    info "LocalStack dashboard:  http://localhost:4566/_localstack/health"
     if [ "$mode" = "lakehouse" ]; then
         info "Flink UI:          http://localhost:8081"
-        info "PostgreSQL:        localhost:5432 (iceberg/iceberg)"
+        info "Polaris:           http://localhost:8181"
     fi
     info ""
     info "Run tests:  ./gradlew build --no-daemon"

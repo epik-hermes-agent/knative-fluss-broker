@@ -117,8 +117,9 @@ Background compaction job that periodically moves older events from Fluss Log Ta
 Activation:
 - Disabled by default
 - Enabled via `iceberg.enabled=true` in broker configuration
-- Uses Fluss's built-in tiering mechanism
-- JDBC catalog (PostgreSQL) as the Iceberg catalog (local and dev)
+- Uses Fluss's built-in tiering mechanism (server-side `datalake.*` config)
+- Polaris REST catalog for Iceberg metadata (via `datalake.iceberg.type: rest`)
+- S3 storage via LocalStack (port 4566, no auth required)
 
 ### Schema Registry
 
@@ -136,10 +137,10 @@ Responsibilities:
 |-----------|-----------|---------|
 | Language | Java | 21 |
 | Build | Gradle | 8.10+ |
-| Event Storage | Apache Fluss | 0.7.x |
-| Lakehouse | Apache Iceberg | 1.4.x |
-| Object Store | MinIO (S3-compatible) | latest |
-| Catalog | JDBC (PostgreSQL) | 16-alpine |
+| Event Storage | Apache Fluss | 1.0-SNAPSHOT |
+| Lakehouse | Apache Iceberg | 1.10.1 |
+| Object Store | LocalStack (S3-compatible) | 4.6.0 |
+| Catalog | Apache Polaris (REST) | 1.3.0-incubating |
 | Framework | Spring Boot | 3.3.x |
 | Kubernetes | fabric8 client | 6.x |
 | Testing | JUnit 5 + Testcontainers | - |

@@ -20,7 +20,6 @@ dependencies {
     testImplementation(libs.bundles.testing.containers)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.testcontainers.kafka)
-    testImplementation(libs.testcontainers.minio)
-    
+
     testRuntimeOnly(libs.logback.classic)
 }

@@ -111,8 +111,8 @@
         <text x="550" y="240" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:2181</text>
 
         <rect x="430" y="265" width="240" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
-        <text x="550" y="287" fill="white" font-size="11" font-weight="600" text-anchor="middle">MinIO (pgsty/minio)</text>
-        <text x="550" y="305" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:9000 • S3-compatible</text>
+        <text x="550" y="287" fill="white" font-size="11" font-weight="600" text-anchor="middle">LocalStack 4.6.0</text>
+        <text x="550" y="305" fill="#94a3b8" font-size="8" text-anchor="middle">localhost:4566 • S3 + STS + IAM</text>
 
         <rect x="430" y="340" width="240" height="50" rx="6" fill="rgba(30,41,59,0.4)" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
         <text x="550" y="362" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">WireMock</text>
@@ -121,7 +121,7 @@
         <!-- Lakehouse profile extras -->
         <rect x="430" y="410" width="240" height="130" rx="8" fill="rgba(76,29,149,0.15)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,4"/>
         <text x="550" y="432" fill="#a78bfa" font-size="9" font-weight="600" text-anchor="middle">--profile lakehouse</text>
-        <text x="550" y="452" fill="#94a3b8" font-size="8" text-anchor="middle">PostgreSQL (JDBC catalog)</text>
+        <text x="550" y="452" fill="#94a3b8" font-size="8" text-anchor="middle">Polaris REST Catalog (port 8181)</text>
         <text x="550" y="468" fill="#94a3b8" font-size="8" text-anchor="middle">Flink JobManager + TaskManager</text>
         <text x="550" y="484" fill="#94a3b8" font-size="8" text-anchor="middle">fluss-lake-iceberg plugin</text>
         <text x="550" y="500" fill="#94a3b8" font-size="8" text-anchor="middle">fluss-flink-tiering JAR</text>
@@ -237,9 +237,9 @@
         <ul>
           <li>• scripts/bootstrap.sh starts everything</li>
           <li>• Fluss 0.9.0-incubating (dual listeners)</li>
-          <li>• pgsty/minio for S3-compatible storage</li>
+          <li>• LocalStack 4.6.0 for S3-compatible storage</li>
           <li>• WireMock in-process (no container)</li>
-          <li>• Lakehouse: +PostgreSQL + Flink</li>
+          <li>• Lakehouse: +Polaris + Flink</li>
         </ul>
       </div>
 

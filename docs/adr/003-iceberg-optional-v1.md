@@ -17,16 +17,16 @@ Include Iceberg in v1 behind a **clean feature toggle** (`table.datalake.enabled
 
 ## Update (2026-04-17)
 
-Initial implementation used custom tiering code (`IcebergTieringJob`, `IcebergCatalogManager`). After discovering Fluss 0.9.0's **native Iceberg tiering support** (FIP-3, `fluss-lake-iceberg` plugin), we switched to the built-in approach:
+Initial implementation used custom tiering code (`IcebergTieringJob`, `IcebergCatalogManager`). After discovering Fluss 1.0-SNAPSHOT's **native Iceberg tiering support** (FIP-3, `fluss-lake-iceberg` plugin), we switched to the built-in approach:
 
 - The `data-plane/iceberg-tiering/` module was **removed entirely**
 - Tiering is now configured via server-side `datalake.*` properties
-- The pre-built `fluss-flink-tiering-0.9.0-incubating.jar` handles compaction
+- The pre-built `fluss-flink-tiering-1.0-SNAPSHOT.jar` handles compaction
 - Tables opt in with `table.datalake.enabled = 'true'`
-- JDBC catalog (PostgreSQL) replaces Hive Metastore (matches Fluss quickstart)
+- Polaris REST catalog replaces JDBC/Hive Metastore
 
 ## Consequences
-- Docker Compose includes MinIO, PostgreSQL, Flink in `lakehouse` profile.
+- Docker Compose includes LocalStack, Polaris, Flink in `lakehouse` profile.
 - Integration tests validate tiering-enabled and tiering-disabled paths.
 - Iceberg failures don't affect core broker write/dispatch paths.
 - No custom tiering Java code — Fluss handles everything natively.

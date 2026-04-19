@@ -7,8 +7,7 @@ dependencies {
     
     api(libs.bundles.testing.containers)
     api(libs.testcontainers.kafka)
-    api(libs.testcontainers.minio)
-    
+
     // Fluss for container testing
     api(libs.fluss.client)
     api(libs.fluss.common)

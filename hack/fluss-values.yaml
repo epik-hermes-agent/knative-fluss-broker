@@ -1,9 +1,10 @@
 # Fluss Helm values for Kind e2e testing
-# Chart: https://downloads.apache.org/incubator/fluss/helm-chart/0.9.0-incubating/
+# Chart: local chart at /Users/pasha/hermes/fluss-main/helm/
+# Fluss version: 1.0-SNAPSHOT (locally built from apache/fluss main, commit a0260f4)
 
 image:
   repository: apache/fluss
-  tag: 0.9.0-incubating
+  tag: 1.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
 # Single tablet server for e2e (lighter footprint)
@@ -16,12 +17,21 @@ coordinator:
   storage:
     enabled: false
 
-# ZooKeeper connection
+# ZooKeeper connection + S3 config for LocalStack
 configurationOverrides:
   zookeeper.address: "zk-zookeeper.default.svc.cluster.local:2181"
   zookeeper.path.root: "/fluss"
   default.bucket.number: "1"
   default.replication.factor: "1"
+  # S3 + STS endpoint override for LocalStack
+  remote.data.dir: "s3://fluss-data/remote"
+  s3.endpoint: "http://localstack.default.svc.cluster.local:4566"
+  s3.access-key: "test"
+  s3.secret-key: "test"
+  s3.region: "us-east-1"
+  s3.path-style-access: "true"
+  s3.assumed.role.arn: "arn:aws:iam::000000000000:role/fluss-delegation"
+  s3.assumed.role.sts.endpoint: "http://localstack.default.svc.cluster.local:4566"
 
 # Resource limits for Kind
 resources:

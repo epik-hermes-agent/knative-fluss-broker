@@ -79,7 +79,7 @@ Patterns and conventions extracted from upstream repositories and documentation,
 - `Admin.dropTable(path, ignoreIfExists)`
 - All DDL operations return `CompletableFuture<Void>` — await with timeout
 
-### Docker Configuration (0.9.0)
+### Docker Configuration (1.0-SNAPSHOT)
 - Requires dual listeners: `INTERNAL` (server-to-server) and `CLIENT` (external)
 - `bind.listeners`: what the server binds to inside the container
 - `advertised.listeners`: what external clients use to connect
@@ -106,24 +106,21 @@ Patterns and conventions extracted from upstream repositories and documentation,
 
 ---
 
-## 5. Testcontainers MinIO — S3 Harness Patterns
+## 5. LocalStack — S3 + STS Harness
 
-**Source**: [java.testcontainers.org/modules/minio](https://java.testcontainers.org/modules/minio/)
+**Source**: [docs.localstack.cloud](https://docs.localstack.cloud/)
 
-### Setup Pattern
-```java
-MinIOContainer minio = new MinIOContainer("minio/minio:latest")
-    .withUserName("minioadmin")
-    .withPassword("minioadmin");
-minio.start();
-String endpoint = minio.getS3URL();
-```
+### Why LocalStack over MinIO
+- Provides S3 + STS + IAM on a single port (4566)
+- STS token delegation works via `s3.assumed.role.sts.endpoint`
+- Last free community edition (4.6.0) — no auth required
+- `test`/`test` dummy credentials
 
 ### Our Adaptation
-- Primary S3 harness uses docker-compose MinIO (persistent, shared across tests)
-- `MinIOTestContainer` in `test/containers/` provides Testcontainers-based MinIO for isolated tests
-- Bucket creation: `mc mb --ignore-existing local/iceberg-warehouse`
-- Path-style access configured via `s3.path.style.access=true`
+- Docker Compose: `localstack/localstack:4.6.0` with `SERVICES=s3,sts,iam`
+- Bucket creation via `localstack-init` service using `awslocal`
+- Fluss config: `s3.endpoint: http://localstack:4566` + `s3.assumed.role.sts.endpoint: http://localstack:4566`
+- Path-style access configured via `s3.path-style-access: true`
 
 ---
 
@@ -135,7 +132,7 @@ String endpoint = minio.getS3URL();
 - Fluss server has built-in lake connector plugin (`fluss-lake-iceberg`)
 - Server-side config: `datalake.format`, `datalake.iceberg.*`
 - Table opt-in: `table.datalake.enabled = 'true'`
-- Tiering Flink job: `fluss-flink-tiering-0.9.0-incubating.jar`
+- Tiering Flink job: `fluss-flink-tiering-1.0-SNAPSHOT.jar`
 - Automatic schema mapping with `__bucket`, `__offset`, `__timestamp` system columns
 - Union read: transparently combines hot (Fluss) + cold (Iceberg) data
 
@@ -146,13 +143,12 @@ String endpoint = minio.getS3URL();
 - `FLINK_HOME/opt/` — Fluss tiering service JAR
 
 ### Catalog Options
-- `datalake.iceberg.type: jdbc` — JDBC catalog (PostgreSQL backend, recommended)
+- `datalake.iceberg.type: rest` — REST catalog (Polaris, recommended)
 - `datalake.iceberg.type: hive` — Hive Metastore
 - `datalake.iceberg.type: hadoop` — Hadoop catalog (file-based, for simple setups)
-- `datalake.iceberg.type: rest` — REST catalog
 
 ### Our Adaptation
 - Docker Compose configures `datalake.*` in `FLUSS_PROPERTIES`
-- JDBC catalog backed by PostgreSQL (matches Fluss quickstart)
+- Polaris REST catalog (replaces JDBC/HMS)
 - NO custom tiering Java code — Fluss handles everything natively
 - Tables created by Broker controller set `table.datalake.enabled = 'true'`

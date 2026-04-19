@@ -1,0 +1,57 @@
+# Polaris Helm values for Knative Fluss Broker K8s deployment.
+# Uses in-memory persistence (suitable for dev/test).
+# For production, switch to relational-jdbc with PostgreSQL.
+#
+# Install:
+#   helm repo add apache-polaris https://apache.github.io/polaris
+#   helm install polaris apache-polaris/polaris -n polaris --create-namespace -f polaris-values.yaml
+
+# Image
+image:
+  repository: apache/polaris
+  tag: "1.3.0-incubating"
+  pullPolicy: IfNotPresent
+
+# Non-persistent backend (in-memory)
+persistence:
+  type: in-memory
+
+# Authentication — internal (bootstrap credentials)
+authentication:
+  type: internal
+  tokenBroker:
+    type: symmetric-key
+    secret:
+      symmetricKey:
+        secretKey: polaris-symmetric-key
+
+# Realm
+realmContext:
+  type: default
+  realms:
+    - POLARIS
+
+# Service
+service:
+  type: ClusterIP
+  ports:
+    - name: polaris-http
+      port: 8181
+      targetPort: 8181
+
+# Bootstrap — creates catalog on startup via init job
+# The polaris-setup.sh script runs as a post-install hook
+replicaCount: 1
+
+# Resource limits for test environment
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Environment variables for S3 (LocalStack in our case)
+# These are set via the Fluss server config, not Polaris itself.
+# Polaris delegates S3 access to Fluss — it only manages catalog metadata.

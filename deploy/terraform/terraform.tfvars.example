@@ -1,0 +1,20 @@
+# Knative Fluss Broker — EKS POC Configuration
+# Copy to terraform.tfvars and edit as needed.
+
+aws_region          = "eu-west-1"
+project_name        = "fluss-broker"
+cluster_name        = "fluss-broker-poc"
+k8s_version         = "1.29"
+node_instance_type  = "t3.large"   # 2 vCPU, 8GB RAM — fits ZK + Fluss + broker
+node_count          = 3
+use_spot            = true         # ~60% cheaper for POC
+
+# S3 buckets (auto-created by Terraform)
+force_destroy_s3    = true         # Allow destroy with objects inside
+
+# Fluss version — must match docker-compose.yml (1.0-SNAPSHOT for local builds)
+fluss_version       = "1.0-SNAPSHOT"
+
+# Controller image (ECR) — build and push first:
+#   make docker-build docker-push ECR_REPO=<account>.dkr.ecr.<region>.amazonaws.com/fluss-broker
+# ecr_image = "123456789.dkr.ecr.eu-west-1.amazonaws.com/fluss-broker:latest"

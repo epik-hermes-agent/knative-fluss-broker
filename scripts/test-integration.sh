@@ -44,9 +44,9 @@ case "${1:-all}" in
         ;;
     lakehouse)
         info "Running Lakehouse/Iceberg integration tests..."
-        # Check MinIO is running
-        if ! nc -zv 127.0.0.1 9000 &>/dev/null 2>&1; then
-            error "MinIO not running at 127.0.0.1:9000. Run: docker compose up -d minio"
+        # Check LocalStack is running
+        if ! nc -zv 127.0.0.1 4566 &>/dev/null 2>&1; then
+            error "LocalStack not running at 127.0.0.1:4566. Run: docker compose up -d localstack"
         fi
         ./gradlew :test:integration:test --tests "*.FlussLakehouseIntegrationTest" --no-daemon
         ;;
