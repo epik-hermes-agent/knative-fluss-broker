@@ -34,3 +34,4 @@ helm-fluss/
 # Kubernetes temp files
 /tmp/fluss-controller.pid
 /tmp/fluss-controller.log
+__pycache__/

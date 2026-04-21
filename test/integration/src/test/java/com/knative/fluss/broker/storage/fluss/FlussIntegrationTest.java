@@ -189,12 +189,12 @@ class FlussIntegrationTest {
         writer.write(brokerTablePath, evt2).get();
         writer.write(brokerTablePath, evt3).get();
 
-        Thread.sleep(2000);
+        Thread.sleep(5000);  // Fluss needs time to flush writes to the log table
 
         FlussEventScanner scanner = new FlussEventScanner(connectionManager);
         try {
             List<Envelope> allRead = new java.util.ArrayList<>();
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 15; i++) {
                 List<Envelope> batch = scanner.scan(brokerTablePath, "test-trigger", 50);
                 allRead.addAll(batch);
                 if (allRead.size() >= 3) break;

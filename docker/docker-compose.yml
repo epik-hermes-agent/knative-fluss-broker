@@ -82,11 +82,12 @@ services:
     ports:
       - "9123:9123"   # CLIENT listener for host
       - "9125:9125"   # INTERNAL listener for Docker network
+      - "9127:9127"   # GATEWAY listener for Docker-side clients (SQL Gateway, TUI)
     environment:
       FLUSS_PROPERTIES: |
         zookeeper.address: zookeeper:2181
-        bind.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://fluss-coordinator:9123
-        advertised.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://localhost:9123
+        bind.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://fluss-coordinator:9123, GATEWAY://fluss-coordinator:9127
+        advertised.listeners: INTERNAL://fluss-coordinator:9125, CLIENT://localhost:9123, GATEWAY://fluss-coordinator:9127
         internal.listener.name: INTERNAL
         data.dir: /tmp/fluss-data
         remote.data.dir: s3://fluss-data/remote
@@ -137,11 +138,12 @@ services:
       - fluss-net
     ports:
       - "9126:9123"   # CLIENT listener for host clients
+      - "9128:9128"   # GATEWAY listener for Docker-side clients (SQL Gateway)
     environment:
       FLUSS_PROPERTIES: |
         zookeeper.address: zookeeper:2181
-        bind.listeners: INTERNAL://fluss-tablet:9124, CLIENT://fluss-tablet:9123
-        advertised.listeners: INTERNAL://fluss-tablet:9124, CLIENT://localhost:9126
+        bind.listeners: INTERNAL://fluss-tablet:9124, CLIENT://fluss-tablet:9123, GATEWAY://fluss-tablet:9128
+        advertised.listeners: INTERNAL://fluss-tablet:9124, CLIENT://localhost:9126, GATEWAY://fluss-tablet:9128
         internal.listener.name: INTERNAL
         tablet-server.id: 0
         data.dir: /tmp/fluss-data
@@ -176,6 +178,34 @@ services:
     volumes:
       - fluss-tablet-data:/data
       - fluss-plugins:/opt/fluss/plugins:ro
+
+  # ──────────────────────────────────────────────
+  # Fluss Broker Ingress (HTTP CloudEvent receiver)
+  # Accepts CloudEvents via HTTP POST at /{namespace}/{broker}
+  # Binary mode: ce-* headers + body
+  # Structured mode: application/cloudevents+json
+  # ──────────────────────────────────────────────
+  fluss-ingress:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.broker
+    container_name: fluss-ingress
+    networks:
+      - fluss-net
+    ports:
+      - "8080:8080"
+    environment:
+      FLUSS_HOST: fluss-coordinator
+      FLUSS_PORT: 9123
+      SERVER_PORT: 8080
+    depends_on:
+      fluss-coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ──────────────────────────────────────────────
   # LocalStack (S3 + STS)
@@ -335,7 +365,7 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
+        taskmanager.numberOfTaskSlots: 8
         state.backend: hashmap
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
@@ -393,6 +423,36 @@ services:
           --datalake.iceberg.s3.region us-east-1 \
           --execution.checkpointing.interval 10s;
         echo 'Tiering job submitted';
+    profiles:
+      - lakehouse
+
+  # ──────────────────────────────────────────────
+  # Flink SQL Gateway — REST API for TUI dashboard queries
+  # Starts on port 8083 by default
+  # ──────────────────────────────────────────────
+  flink-sql-gateway:
+    image: flink:1.20.3-scala_2.12-java17
+    container_name: fluss-flink-sql-gateway
+    networks:
+      - fluss-net
+    ports:
+      - "8083:8083"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        rest.address: flink-jobmanager
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    command: /opt/flink/bin/sql-gateway.sh start-foreground -Dsql-gateway.endpoint.rest.address=0.0.0.0
+    depends_on:
+      flink-jobmanager:
+        condition: service_started
+      flink-taskmanager:
+        condition: service_started
+    volumes:
+      - flink-lib:/opt/flink/lib:ro
+      - flink-opt:/opt/flink/opt:ro
     profiles:
       - lakehouse
 

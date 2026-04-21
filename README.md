@@ -40,6 +40,25 @@ make docker-down            # Tear down containers + volumes
 
 > **E2E tests** require `make docker-up-lakehouse` first — they ingest CloudEvents, verify Fluss persistence, tier to Iceberg via the native tiering job, and query back with both union reads and `$lake`.
 
+## Live Dashboard
+
+```bash
+# Start infrastructure (with lakehouse for full features)
+make docker-up-lakehouse
+
+# Launch the live TUI dashboard
+make dashboard
+```
+
+The dashboard shows real-time event flow through the pipeline:
+- **Ingress** — CloudEvents arriving at the broker with full payload
+- **Fluss Storage** — Events in the hot log table
+- **Iceberg Tiering** — Events tiered to cold storage
+- **Dispatchers** — Per-trigger delivery status and backpressure
+- **Dead Letter Queue** — Failed events with failure context
+
+Navigation: `q` quit, `r` refresh, `j/k` navigate, `1-5` switch tabs, `TAB` next tab.
+
 ## How It Works
 
 **Data Plane** (event path):
@@ -85,6 +104,8 @@ docker/            Docker Compose + Dockerfile + init scripts
 config/            CRD YAML, K8s manifests, sample resources
 hack/              Kind cluster scripts, Helm values
 test/              Testcontainers, WireMock, integration, e2e, perf
+tools/
+  tui/             Live TUI dashboard (TamboUI)
 docs/              Architecture, ADRs, runbooks, diagrams
 ```
 

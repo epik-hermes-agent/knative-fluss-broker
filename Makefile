@@ -11,10 +11,11 @@
 #   make watch             # Watch events in Fluss
 #   make health            # Check all services
 
-.PHONY: all build test test-integration test-e2e test-e2e-k8s clean \
-        kind-up kind-down kind-install kind-deploy kind-test kind-debug \
-        publish publish-batch watch health \
-        docker-up docker-up-lakehouse docker-down docker-logs \
+.PHONY: all build test test-integration test-e2e test-e2e-k8s clean \\
+        kind-up kind-down kind-install kind-deploy kind-test kind-debug \\
+        publish publish-batch watch health \\
+        docker-up docker-up-lakehouse docker-down docker-logs \\
+        cleanup cleanup-jobs cleanup-soft cleanup-all \\
         deploy-init deploy-plan deploy-apply deploy-destroy deploy-kubeconfig
 
 # ─────────────────────────────────────────────
@@ -129,7 +130,10 @@ docker-up-lakehouse: docker-up
 	docker compose -f docker/docker-compose.yml --profile lakehouse up -d
 	@echo "Waiting for tiering job..."
 	@sleep 15
-	@echo "Lakehouse stack ready. Run: make test-e2e"
+	@echo "Lakehouse stack ready."
+	@echo "  Flink UI:     http://localhost:8081"
+	@echo "  SQL Gateway:  http://localhost:8083"
+	@echo "  Run: make dashboard"
 
 ## Tear down all containers and volumes
 docker-down:
@@ -139,6 +143,22 @@ docker-down:
 ## Tail logs from all services
 docker-logs:
 	docker compose -f docker/docker-compose.yml --profile lakehouse logs -f --tail=50
+
+## Cancel all Flink jobs (keep containers)
+cleanup-jobs:
+	@./scripts/cleanup.sh --jobs
+
+## Cancel jobs + wipe S3 data (keep containers)
+cleanup-soft:
+	@./scripts/cleanup.sh --soft
+
+## Full cleanup: jobs + containers + volumes + data
+cleanup:
+	@./scripts/cleanup.sh
+
+## Full cleanup including lakehouse profile
+cleanup-all:
+	@./scripts/cleanup.sh --lakehouse
 
 # ─────────────────────────────────────────────
 # AWS EKS Deployment (Terraform)
@@ -162,3 +182,15 @@ deploy-kubeconfig:
 		REGION=$$(terraform output -raw cluster_endpoint | sed 's|https://.*\.\(.*\)\.eks.*|\1|') && \
 		aws eks update-kubeconfig --name "$$CLUSTER" --region "$$REGION" && \
 		echo "kubectl configured for $$CLUSTER"
+
+# ─────────────────────────────────────────────
+# TUI Dashboard
+# ─────────────────────────────────────────────
+
+## Launch the live TUI dashboard
+dashboard:
+	@./scripts/launch-tui.sh
+
+## Build the TUI dashboard JAR
+dashboard-build:
+	./gradlew :tools:tui:shadowJar --no-daemon

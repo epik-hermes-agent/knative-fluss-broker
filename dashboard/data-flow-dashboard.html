@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knative Fluss Broker — Data Flow Dashboard</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0A0E17; }
+    canvas { display: block; }
+    #ui-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10; font-family: 'Inter', 'SF Mono', 'Fira Code', monospace;
+    }
+    .toggle-btn {
+      pointer-events: auto; cursor: pointer; padding: 8px 16px; margin: 6px;
+      border-radius: 8px; border: 1px solid rgba(100,116,139,0.3);
+      background: linear-gradient(145deg, rgba(10,14,23,0.95), rgba(20,28,40,0.95));
+      color: #E2E8F0; font-size: 14px;
+      font-family: 'Inter', sans-serif; font-weight: 500; display: inline-block;
+      transition: all 0.3s ease-out; backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .toggle-btn:hover {
+      border-color: rgba(255,255,255,0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .toggle-btn.active {
+      border-color: #FBBF24;
+      color: #FBBF24;
+      background: linear-gradient(145deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05));
+      box-shadow: 0 0 20px rgba(251,191,36,0.4), inset 0 0 10px rgba(251,191,36,0.8);
+      transform: translateY(0);
+    }
+    #controls { position: fixed; top: 24px; right: 24px; z-index: 20; }
+    #tooltip {
+      pointer-events: none; position: fixed; display: none; z-index: 30;
+      background: linear-gradient(135deg, rgba(15,20,30,0.98), rgba(25,35,50,0.98));
+      border: 1px solid rgba(100,116,139,0.4);
+      border-radius: 10px; padding: 18px 22px; color: #E2E8F0; max-width: 360px;
+      font-family: 'Inter', sans-serif; font-size: 13px;
+      line-height: 1.6; backdrop-filter: blur(16px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+      transform: translate(-50%, -100%); /* Adjust to position above cursor */
+      white-space: pre-wrap;
+    }
+    #tooltip h3 { margin: 0 0 10px 0; font-size: 16px; color: #FBBF24; font-weight: 700; }
+    #tooltip .metric { color: #06B6D4; font-weight: 600; }
+    #tooltip .desc { color: #94A3B8; font-size: 12px; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="controls">
+  <div class="toggle-btn active" onclick="toggleLayer('hot')" id="btn-hot">Hot Tier</div>
+  <div class="toggle-btn active" onclick="toggleLayer('cold')" id="btn-cold">Cold Tier</div>
+  <div class="toggle-btn active" onclick="toggleLayer('dlq')" id="btn-dlq">DLQ</div>
+  <div class="toggle-btn active" onclick="toggleLayer('metrics')" id="btn-metrics">Metrics</div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+p5.disableFriendlyErrors = true;
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const PALETTE = {
+  bg:         [10, 14, 23],        // Dark Blue-Grey
+  grid:       [18, 24, 40],        // Slightly lighter bg
+  source:     [245, 158, 11],      // Amber
+  ingress:    [59, 130, 246],      // Blue
+  schema:     [168, 85, 247],      // Purple
+  fluss:      [6, 182, 212],       // Cyan
+  writer:     [34, 197, 94],       // Green
+  dispatcher: [34, 197, 94],       // Green (same as writer for consistency)
+  subscriber: [249, 115, 22],      // Orange
+  dlq:        [239, 68, 68],       // Red
+  tiering:    [20, 184, 166],      // Teal
+  iceberg:    [224, 242, 254],     // Light Blue (almost white)
+  text:       [226, 232, 240],     // Off-white
+  textDim:    [100, 116, 139],     // Slate grey
+  accent:     [251, 191, 36],      // Yellow/Gold
+  white:      [255, 255, 255],
+  fadeColor:  [0, 0, 0, 5],        // For trail fade
+};
+
+const CONFIG = {
+  paused: false,
+  layers: { hot: true, cold: true, dlq: true, metrics: true },
+  zoom: 1,
+  particleCount: 50, // More particles for denser flows
+  showMetrics: true,
+  noiseScale: 0.005, // For background noise
+  bloomIntensity: 80, // Bloom effect intensity
+  bloomBlur: 8,       // Bloom blur radius
+  gridAlpha: 15,      // Faded grid
+};
+
+// ============================================================
+// LIVE METRICS — polls /api/metrics every 5 seconds
+// ============================================================
+let liveMetrics = null;
+let metricsAge = 0;
+
+async function fetchMetrics() {
+  try {
+    const resp = await fetch('/api/metrics');
+    if (resp.ok) {
+      liveMetrics = await resp.json();
+      metricsAge = 0;
+      _applyLiveMetrics();
+    }
+  } catch (e) { /* metrics server not running, use simulation */ }
+}
+
+function _applyLiveMetrics() {
+  if (!liveMetrics) return;
+
+  // Update node metrics from live data
+  const m = liveMetrics;
+
+  // Flink tiering
+  if (m.flink?.tieringJob) {
+    let tj = m.flink.tieringJob;
+    let durSec = (tj.durationMs / 1000).toFixed(0);
+    nodes.tiering.metrics = {
+      status: tj.state,
+      duration: durSec + 's',
+      insertJobs: m.flink.insertJobCount + ' active',
+    };
+    // Update tiering node glow based on state
+    nodes.tiering.alive = tj.state === 'RUNNING';
+  }
+
+  // S3 / Iceberg
+  if (m.s3) {
+    let szMB = (m.s3.totalBytes / 1048576).toFixed(1);
+    nodes.iceberg.metrics = {
+      files: m.s3.files.toString(),
+      size: szMB + ' MB',
+    };
+    nodes.lake.metrics = {
+      files: m.s3.files + ' on S3',
+      size: szMB + ' MB total',
+    };
+  }
+
+  // Container health
+  if (m.containers) {
+    let status = m.clusterHealthy ? 'HEALTHY' : 'DEGRADED';
+    nodes.fluss.metrics.clusterStatus = m.containers.running + '/' + m.containers.total + ' containers';
+    nodes.fluss.alive = m.clusterHealthy;
+  }
+
+  // Flink insert jobs → adjust tiering particle rate
+  if (m.flink?.insertJobCount > 0) {
+    // Scale tiering flow rate by number of active insert jobs
+    let tieringFlow = flows.find(f => f.fromId === 'fluss' && f.toId === 'tiering');
+    if (tieringFlow) tieringFlow.rate = 0.1 + m.flink.insertJobCount * 0.05;
+  }
+}
+
+// Fetch metrics on load and every 5s
+fetchMetrics();
+setInterval(fetchMetrics, 5000);
+
+// ============================================================
+// NODE DEFINITIONS
+// ============================================================
+const NODE_DEFS = [
+  { id: 'source',     label: 'Event Sources',      type: 'source',     color: 'source',
+    desc: 'Knative event sources producing CloudEvents via HTTP POST.',
+    metrics: { throughput: '1,247 evt/s', latency: '—' },
+    shape: 'circle' },
+  { id: 'ingress',    label: 'Ingress Server',     type: 'ingress',    color: 'ingress',
+    desc: 'HTTP server accepting binary & structured CloudEvents.
+Endpoint: POST /{namespace}/{broker}',
+    metrics: { throughput: '1,247 evt/s', latency: '4ms p50 / 12ms p99' },
+    shape: 'hexagon' },
+  { id: 'schema',     label: 'Schema Registry',    type: 'schema',     color: 'schema',
+    desc: 'Embedded registry backed by Fluss table.
+Auto-infers JSON schemas, versions per event type.',
+    metrics: { lookups: '892/s', schemas: '23 registered' },
+    shape: 'diamond' },
+  { id: 'writer',     label: 'FlussEventWriter',   type: 'writer',     color: 'writer',
+    desc: 'Batched async writer to Fluss LOG tables.
+Batch: 100 events / 50ms timeout.',
+    metrics: { writes: '1,247/s', batchAvg: '47 events' },
+    shape: 'rect' },
+  { id: 'fluss',      label: 'Fluss LOG Tables',   type: 'fluss',      color: 'fluss',
+    desc: 'Append-only log tables, HASH(event_id) 4 buckets.
+Hot tier — durable event storage.',
+    metrics: { rows: '2.4M', partitions: '4 buckets', clusterStatus: '—' },
+    shape: 'cylinder' },
+  { id: 'dispatcher', label: 'Dispatcher',         type: 'dispatcher', color: 'dispatcher',
+    desc: 'Credit-based delivery engine (per-trigger).
+100 credits/lane, 10 refill/s, up to 10 concurrent lanes.',
+    metrics: { delivered: '1,198/s', lanes: '3 active / 1 paused' },
+    shape: 'pentagon' },
+  { id: 'subscriber', label: 'Subscriber Sinks',   type: 'subscriber', color: 'subscriber',
+    desc: 'Knative Trigger targets — HTTP push delivery.
+At-least-once with exponential backoff retry.',
+    metrics: { ackRate: '99.5%', avgLatency: '23ms' },
+    shape: 'circle' },
+  { id: 'dlq',        label: 'DLQ Table',          type: 'dlq',        color: 'dlq',
+    desc: 'Dead letter queue — poison messages after
+max retries exhausted. Fluss LOG table.',
+    metrics: { rate: '6 evt/s', total: '14,203' },
+    shape: 'cylinder' },
+  { id: 'tiering',    label: 'Flink Tiering Job',  type: 'tiering',    color: 'tiering',
+    desc: 'Native Fluss→Iceberg tiering service.
+Polls every 30s, compacts to Parquet on S3.',
+    metrics: { batchSize: '~10K/30s', status: 'RUNNING' },
+    shape: 'gear' },
+  { id: 'iceberg',    label: 'Iceberg + S3',       type: 'iceberg',    color: 'iceberg',
+    desc: 'Cold datalake — Iceberg tables on S3 (LocalStack).
+Polaris REST catalog for metadata.',
+    metrics: { files: '847', size: '2.1 GB' },
+    shape: 'crystal' },
+  { id: 'lake',       label: '$lake Query',        type: 'iceberg',    color: 'iceberg',
+    desc: 'Fluss $lake system table — transparent union
+of hot (Fluss) + cold (Iceberg) reads.',
+    metrics: { queries: '12/min', latency: '340ms' },
+    shape: 'rect' },
+];
+
+// Node positions (relative 0-1 space, laid out in setup)
+const NODE_LAYOUT = {
+  source:     { x: 0.50, y: 0.06 },
+  ingress:    { x: 0.50, y: 0.18 },
+  schema:     { x: 0.20, y: 0.30 },
+  writer:     { x: 0.65, y: 0.30 },
+  fluss:      { x: 0.50, y: 0.44 },
+  dispatcher: { x: 0.25, y: 0.62 },
+  subscriber: { x: 0.25, y: 0.80 },
+  dlq:        { x: 0.55, y: 0.78 },
+  tiering:    { x: 0.78, y: 0.58 },
+  iceberg:    { x: 0.78, y: 0.74 },
+  lake:       { x: 0.92, y: 0.84 },
+};
+
+// ============================================================
+// FLOW DEFINITIONS
+// ============================================================
+const FLOW_DEFS = [
+  { from: 'source',     to: 'ingress',    color: 'source',     layer: 'hot',   rate: 1.0,  label: 'CloudEvents' },
+  { from: 'ingress',    to: 'schema',     color: 'schema',     layer: 'hot',   rate: 0.4,  label: 'Schema lookup' },
+  { from: 'ingress',    to: 'writer',     color: 'ingress',    layer: 'hot',   rate: 1.0,  label: 'Envelope' },
+  { from: 'writer',     to: 'fluss',      color: 'fluss',      layer: 'hot',   rate: 1.0,  label: 'Append rows' },
+  { from: 'fluss',      to: 'dispatcher', color: 'dispatcher', layer: 'hot',   rate: 0.8,  label: 'Scan + deliver' },
+  { from: 'dispatcher', to: 'subscriber', color: 'subscriber', layer: 'hot',   rate: 0.75, label: 'HTTP push' },
+  { from: 'dispatcher', to: 'dlq',        color: 'dlq',        layer: 'dlq',   rate: 0.05, label: 'Failed events' },
+  { from: 'fluss',      to: 'tiering',    color: 'tiering',    layer: 'cold',  rate: 0.15, label: 'Compaction' },
+  { from: 'tiering',    to: 'iceberg',    color: 'iceberg',    layer: 'cold',  rate: 0.15, label: 'Parquet write' },
+  { from: 'iceberg',    to: 'lake',       color: 'iceberg',    layer: 'cold',  rate: 0.08, label: '$lake read' },
+];
+
+// ============================================================
+// GLOBALS
+// ============================================================
+let nodes = {};
+let flows = [];
+let trailBuffer;    // For particle trails
+let bloomBuffer;    // For bloom effect
+let backgroundBuffer; // For static background noise
+let hoveredNode = null;
+let selectedNode = null;
+let t = 0;
+let canvasW, canvasH;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function fbm(x, y, octaves = 4, lacunarity = 2.0, gain = 0.5, time = 0) {
+  let value = 0;
+  let amplitude = 1.0;
+  let frequency = 1.0;
+  let maxValue = 0;
+  for (let i = 0; i < octaves; i++) {
+    value += noise(x * frequency, y * frequency, time) * amplitude;
+    maxValue += amplitude;
+    amplitude *= gain;
+    frequency *= lacunarity;
+  }
+  return value / maxValue;
+}
+
+// ============================================================
+// CLASSES
+// ============================================================
+class FlowNode {
+  constructor(def) {
+    this.id = def.id;
+    this.label = def.label;
+    this.type = def.type;
+    this.colorKey = def.color;
+    this.baseColor = PALETTE[def.color];
+    this.desc = def.desc;
+    this.metrics = def.metrics;
+    this.shape = def.shape;
+    this.x = 0; this.y = 0;
+    this.baseSize = 0;
+    this.pulsePhase = random(TWO_PI);
+    this.glowPulse = 0;
+    this.alive = true; // For live metrics status
+  }
+
+  setPosition(rx, ry) {
+    this.x = rx * canvasW;
+    this.y = ry * canvasH;
+    this.baseSize = min(canvasW, canvasH) * 0.04;
+  }
+
+  getRadius() { return this.baseSize; }
+
+  contains(mx, my) {
+    return dist(mx, my, this.x, this.y) < this.baseSize * 1.5;
+  }
+
+  draw(isHovered, isSelected) {
+    push();
+    translate(this.x, this.y);
+
+    let [r, g, b] = this.baseColor;
+    let pulse = sin(t * 2 + this.pulsePhase) * 0.05 + 1;
+    let sz = this.baseSize * pulse;
+
+    // Node "health" glow
+    if (this.alive) {
+      let healthAlpha = map(sin(t * 5 + this.pulsePhase), -1, 1, 10, 40);
+      drawingContext.shadowBlur = 20;
+      drawingContext.shadowColor = color(r, g, b, healthAlpha);
+    } else {
+      drawingContext.shadowBlur = 0;
+    }
+
+    // Outer glow (subtle, always on)
+    for (let i = 2; i >= 1; i--) {
+      let gs = sz * (1 + i * 0.2);
+      fill(r, g, b, 15 / i);
+      noStroke();
+      ellipse(0, 0, gs * 2, gs * 2);
+    }
+    drawingContext.shadowBlur = 0; // Reset shadow
+
+    // Main shape with gradient
+    let alpha = isHovered ? 240 : (isSelected ? 220 : 180);
+    let edgeColor = color(r, g, b, alpha);
+    let centerColor = color(r, g, b, alpha * 0.6);
+
+    // Apply radial gradient fill (simulated)
+    let gradientFill = drawingContext.createRadialGradient(0, 0, 0, 0, 0, sz * 1.2);
+    gradientFill.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+    gradientFill.addColorStop(1, `rgba(${r},${g},${b},${alpha * 0.5})`);
+    drawingContext.fillStyle = gradientFill;
+
+    stroke(r, g, b, alpha * 0.8);
+    strokeWeight(isHovered || isSelected ? 2.5 : 1.5);
+
+    if (this.shape === 'hexagon') this._hexagon(sz);
+    else if (this.shape === 'diamond') this._diamond(sz);
+    else if (this.shape === 'cylinder') this._cylinder(sz);
+    else if (this.shape === 'pentagon') this._pentagon(sz);
+    else if (this.shape === 'gear') this._gear(sz);
+    else if (this.shape === 'crystal') this._crystal(sz);
+    else if (this.shape === 'rect') this._rectShape(sz);
+    else ellipse(0, 0, sz * 2, sz * 2);
+
+    // Inner detail
+    fill(r, g, b, 60);
+    noStroke();
+    if (this.shape === 'cylinder') {
+      ellipse(0, -sz * 0.3, sz * 1.2, sz * 0.4);
+    }
+
+    // Label
+    fill(PALETTE.text[0], PALETTE.text[1], PALETTE.text[2], isHovered ? 255 : 220);
+    noStroke();
+    textAlign(CENTER, TOP);
+    textSize(max(11, this.baseSize * 0.35));
+    textFont('Inter'); // Modern font for labels
+    textStyle(BOLD);
+    text(this.label, 0, sz + 8);
+
+    // Metrics badge
+    if (CONFIG.showMetrics && CONFIG.layers.metrics) {
+      let firstMetric = Object.values(this.metrics)[0];
+      if (firstMetric && firstMetric !== '—') {
+        fill(PALETTE.bg[0], PALETTE.bg[1], PALETTE.bg[2], 200);
+        stroke(r, g, b, 80);
+        strokeWeight(0.5);
+        rectMode(CENTER);
+        let tw = textWidth(firstMetric) + 16;
+        let th = 20;
+        rect(0, -sz - th, tw, th, 5); // Rounded rect
+        fill(r, g, b, 255);
+        noStroke();
+        textSize(11);
+        textStyle(NORMAL);
+        textFont('Fira Code'); // Monospace for metrics
+        text(firstMetric, 0, -sz - th - 4);
+        rectMode(CORNER);
+      }
+    }
+
+    pop();
+  }
+
+  _hexagon(sz) {
+    beginShape();
+    for (let i = 0; i < 6; i++) {
+      let a = TWO_PI / 6 * i - PI / 6;
+      vertex(cos(a) * sz, sin(a) * sz);
+    }
+    endShape(CLOSE);
+  }
+
+  _diamond(sz) {
+    beginShape();
+    vertex(0, -sz); vertex(sz * 0.8, 0);
+    vertex(0, sz); vertex(-sz * 0.8, 0);
+    endShape(CLOSE);
+  }
+
+  _cylinder(sz) {
+    rectMode(CENTER);
+    rect(0, 0, sz * 2, sz * 1.6, 6);
+    rectMode(CORNER);
+    // Top ellipse
+    fill(this.baseColor[0], this.baseColor[1], this.baseColor[2], 120);
+    ellipse(0, -sz * 0.8, sz * 2, sz * 0.5);
+  }
+
+  _pentagon(sz) {
+    beginShape();
+    for (let i = 0; i < 5; i++) {
+      let a = TWO_PI / 5 * i - PI / 2;
+      vertex(cos(a) * sz, sin(a) * sz);
+    }
+    endShape(CLOSE);
+  }
+
+  _gear(sz) {
+    let teeth = 8;
+    beginShape();
+    for (let i = 0; i < teeth * 2; i++) {
+      let a = TWO_PI / (teeth * 2) * i - PI / 2;
+      let r2 = (i % 2 === 0) ? sz : sz * 0.7;
+      vertex(cos(a) * r2, sin(a) * r2);
+    }
+    endShape(CLOSE);
+  }
+
+  _crystal(sz) {
+    beginShape();
+    vertex(0, -sz * 1.2);
+    vertex(sz * 0.7, -sz * 0.3);
+    vertex(sz * 0.5, sz * 0.8);
+    vertex(-sz * 0.5, sz * 0.8);
+    vertex(-sz * 0.7, -sz * 0.3);
+    endShape(CLOSE);
+    // Inner facet lines
+    stroke(this.baseColor[0], this.baseColor[1], this.baseColor[2], 60);
+    strokeWeight(0.5);
+    line(0, -sz * 1.2, -sz * 0.5, sz * 0.8);
+    line(0, -sz * 1.2, sz * 0.5, sz * 0.8);
+    line(-sz * 0.7, -sz * 0.3, sz * 0.7, -sz * 0.3);
+  }
+
+  _rectShape(sz) {
+    rectMode(CENTER);
+    rect(0, 0, sz * 2.2, sz * 1.4, 5);
+    rectMode(CORNER);
+  }
+}
+
+class Particle {
+  constructor(flow, idx) {
+    this.flow = flow;
+    this.t = random(0, 1); // Start at random position on path
+    this.speed = random(0.002, 0.005) * (flow.rate + 0.5); // Slower, more deliberate
+    this.size = random(3.0, 5.0);
+    this.alpha = random(180, 255);
+    this.trail = [];
+    this.maxTrail = 10; // Longer trails
+    this.alive = true;
+    this.offset = random(-12, 12); // Wider spread
+  }
+
+  update() {
+    this.t += this.speed;
+    if (this.t >= 1) { this.alive = false; return; }
+
+    let pos = this.flow.getPoint(this.t, this.offset);
+    this.trail.unshift({ x: pos.x, y: pos.y });
+    if (this.trail.length > this.maxTrail) this.trail.pop();
+  }
+
+  draw(buffer) {
+    if (!this.alive || this.trail.length === 0) return;
+    let [r, g, b] = this.flow.color;
+
+    buffer.push();
+    buffer.blendMode(ADD); // Additive blending for glowy particles
+
+    // Trail
+    for (let i = 0; i < this.trail.length; i++) {
+      let a = map(i, 0, this.trail.length, this.alpha, 0);
+      let s = map(i, 0, this.trail.length, this.size, 1);
+      buffer.fill(r, g, b, a * 0.8); // Faded trail
+      buffer.noStroke();
+      buffer.ellipse(this.trail[i].x, this.trail[i].y, s, s);
+    }
+    buffer.pop();
+  }
+}
+
+class FlowStream {
+  constructor(def) {
+    this.fromId = def.from;
+    this.toId = def.to;
+    this.colorKey = def.color;
+    this.color = PALETTE[def.color];
+    this.layer = def.layer;
+    this.rate = def.rate;
+    this.label = def.label;
+    this.particles = [];
+    this.fromNode = null;
+    this.toNode = null;
+    this.cp1 = { x: 0, y: 0 };
+    this.cp2 = { x: 0, y: 0 };
+    this.highlighted = false;
+    this.strokeWidth = random(1, 2); // Variable stroke width for flows
+  }
+
+  init() {
+    this.fromNode = nodes[this.fromId];
+    this.toNode = nodes[this.toId];
+    this._calcControlPoints();
+  }
+
+  _calcControlPoints() {
+    let fx = this.fromNode.x, fy = this.fromNode.y;
+    let tx = this.toNode.x, ty = this.toNode.y;
+    let mx = (fx + tx) / 2, my = (fy + ty) / 2;
+    let dx = tx - fx, dy = ty - fy;
+    let len = sqrt(dx * dx + dy * dy);
+    // Perpendicular offset for curve, more pronounced
+    let px = -dy / len * len * random(0.2, 0.4);
+    let py = dx / len * len * random(0.2, 0.4);
+    this.cp1 = { x: fx + dx * random(0.2, 0.4) + px * 0.5, y: fy + dy * random(0.2, 0.4) + py * 0.5 };
+    this.cp2 = { x: fx + dx * random(0.6, 0.8) + px * 0.3, y: fy + dy * random(0.6, 0.8) + py * 0.3 };
+  }
+
+  getPoint(t, perpOffset) {
+    let fx = this.fromNode.x, fy = this.fromNode.y;
+    let tx = this.toNode.x, ty = this.toNode.y;
+    let u = 1 - t;
+    let x = u*u*u*fx + 3*u*u*t*this.cp1.x + 3*u*t*t*this.cp2.x + t*t*t*tx;
+    let y = u*u*u*fy + 3*u*u*t*this.cp1.y + 3*u*t*t*this.cp2.y + t*t*t*ty;
+    // Tangent for perpendicular offset
+    let dx = 3*u*u*(this.cp1.x-fx) + 6*u*t*(this.cp2.x-this.cp1.x) + 3*t*t*(tx-this.cp2.x);
+    let dy = 3*u*u*(this.cp1.y-fy) + 6*u*t*(this.cp2.y-this.cp1.y) + 3*t*t*(ty-this.cp2.y);
+    let len = sqrt(dx*dx + dy*dy) || 1;
+    x += (-dy / len) * perpOffset;
+    y += (dx / len) * perpOffset;
+    return { x, y };
+  }
+
+  isVisible() {
+    return CONFIG.layers[this.layer] !== false && this.fromNode.alive && this.toNode.alive;
+  }
+
+  spawnParticle() {
+    if (!this.isVisible()) return;
+    this.particles.push(new Particle(this, this.particles.length));
+  }
+
+  update() {
+    // Spawn new particles based on rate
+    if (!CONFIG.paused && random() < this.rate * 0.08) { // Adjust rate for more particles
+      this.spawnParticle();
+    }
+    for (let p of this.particles) p.update();
+    this.particles = this.particles.filter(p => p.alive);
+  }
+
+  drawBase() {
+    if (!this.isVisible()) return;
+    let [r, g, b] = this.color;
+    let alpha = this.highlighted ? 80 : 30; // More visible
+    stroke(r, g, b, alpha);
+    strokeWeight(this.highlighted ? 3 : this.strokeWidth); // Highlighted is thicker
+    noFill();
+
+    beginShape();
+    for (let t = 0; t <= 1; t += 0.02) { // Smoother curve
+      let p = this.getPoint(t, 0);
+      vertex(p.x, p.y);
+    }
+    endShape();
+
+    // Animated dashes
+    if (!CONFIG.paused) {
+      stroke(r, g, b, alpha * 2);
+      strokeWeight(this.highlighted ? 2 : 1);
+      let dashLen = 10;
+      let gapLen = 15;
+      let offset = (t * 100) % (dashLen + gapLen); // Faster dash animation
+      for (let d = offset; d < 1; d += (dashLen + gapLen) / (this._approxLen())) {
+        let p1 = this.getPoint(max(0, d), 0);
+        let p2 = this.getPoint(min(1, d + dashLen / this._approxLen()), 0);
+        line(p1.x, p1.y, p2.x, p2.y);
+      }
+    }
+  }
+
+  _approxLen() {
+    let fx = this.fromNode.x, fy = this.fromNode.y;
+    let tx = this.toNode.x, ty = this.toNode.y;
+    return dist(fx, fy, tx, ty);
+  }
+
+  drawParticles() {
+    if (!this.isVisible()) return;
+    for (let p of this.particles) p.draw(trailBuffer); // Draw particles to trailBuffer
+  }
+
+  drawArrowhead() {
+    if (!this.isVisible()) return;
+    let [r, g, b] = this.color;
+    let p = this.getPoint(0.92, 0);
+    let p2 = this.getPoint(0.88, 0);
+    let angle = atan2(p.y - p2.y, p.x - p2.x);
+    push();
+    translate(p.x, p.y);
+    rotate(angle);
+    fill(r, g, b, this.highlighted ? 220 : 150);
+    noStroke();
+    triangle(0, 0, -12, -5, -12, 5); // Larger arrowhead
+    pop();
+  }
+}
+
+// ============================================================
+// SETUP
+// ============================================================
+function setup() {
+  canvasW = windowWidth;
+  canvasH = windowHeight;
+  createCanvas(canvasW, canvasH);
+  pixelDensity(1);
+  colorMode(RGB, 255, 255, 255, 255);
+  textFont('Inter'); // Default font
+
+  // Create offscreen graphics buffers
+  trailBuffer = createGraphics(canvasW, canvasH);
+  trailBuffer.colorMode(RGB, 255, 255, 255, 255);
+
+  bloomBuffer = createGraphics(canvasW, canvasH);
+  bloomBuffer.colorMode(RGB, 255, 255, 255, 255);
+
+  backgroundBuffer = createGraphics(canvasW, canvasH);
+  backgroundBuffer.colorMode(RGB, 255, 255, 255, 255);
+  _drawStaticBackground(backgroundBuffer); // Draw once
+
+  // Initialize nodes
+  for (let def of NODE_DEFS) {
+    let node = new FlowNode(def);
+    let layout = NODE_LAYOUT[def.id];
+    node.setPosition(layout.x, layout.y);
+    nodes[def.id] = node;
+  }
+
+  // Initialize flows
+  for (let def of FLOW_DEFS) {
+    let flow = new FlowStream(def);
+    flow.init();
+    flows.push(flow);
+  }
+}
+
+// ============================================================
+// DRAW
+// ============================================================
+function draw() {
+  if (!CONFIG.paused) t += 0.01; // Slower global time for more subtle motion
+
+  // Draw static background
+  image(backgroundBuffer, 0, 0);
+
+  // Fade trails in trailBuffer
+  trailBuffer.push();
+  trailBuffer.fill(PALETTE.fadeColor); // Use a subtle fade color
+  trailBuffer.noStroke();
+  trailBuffer.rect(0, 0, canvasW, canvasH);
+  trailBuffer.pop();
+
+  // Update hovered node
+  hoveredNode = null;
+  for (let id in nodes) {
+    if (nodes[id].contains(mouseX, mouseY)) {
+      hoveredNode = nodes[id];
+      break;
+    }
+  }
+
+  // Highlight connected flows
+  for (let f of flows) f.highlighted = false;
+  if (hoveredNode || selectedNode) {
+    let focusNode = hoveredNode || selectedNode;
+    for (let f of flows) {
+      if (f.fromId === focusNode.id || f.toId === focusNode.id) {
+        f.highlighted = true;
+      }
+    }
+  }
+
+  // Draw flow bases (curves)
+  for (let f of flows) f.drawBase();
+  for (let f of flows) f.drawArrowhead();
+
+  // Update and draw particles to trail buffer
+  for (let f of flows) f.update();
+  for (let f of flows) f.drawParticles();
+
+  // Draw trail buffer to main canvas
+  image(trailBuffer, 0, 0);
+
+  // Draw nodes
+  for (let id in nodes) {
+    let n = nodes[id];
+    let isHov = hoveredNode === n;
+    let isSel = selectedNode === n;
+    n.draw(isHov, isSel);
+  }
+
+  // Apply Bloom effect
+  _applyBloom();
+
+  // Draw UI elements
+  _drawTitle();
+  _drawLegend();
+  _drawHints();
+  _updateTooltip();
+}
+
+// ============================================================
+// BACKGROUND
+// ============================================================
+function _drawStaticBackground(buffer) {
+  buffer.background(PALETTE.bg);
+  buffer.noiseSeed(42);
+
+  // Subtle FBM noise texture
+  buffer.loadPixels();
+  let [r, g, b] = PALETTE.bg;
+  for (let y = 0; y < buffer.height; y++) {
+    for (let x = 0; x < buffer.width; x++) {
+      let n = fbm(x * CONFIG.noiseScale, y * CONFIG.noiseScale, 3, 2.0, 0.5, t * 0.05);
+      let noiseVal = map(n, 0, 1, -15, 15);
+      let idx = 4 * (y * buffer.width + x);
+      buffer.pixels[idx] = constrain(r + noiseVal, 0, 255);
+      buffer.pixels[idx + 1] = constrain(g + noiseVal, 0, 255);
+      buffer.pixels[idx + 2] = constrain(b + noiseVal, 0, 255);
+      buffer.pixels[idx + 3] = 255;
+    }
+  }
+  buffer.updatePixels();
+
+  // Grid
+  buffer.stroke(PALETTE.grid[0], PALETTE.grid[1], PALETTE.grid[2], CONFIG.gridAlpha);
+  buffer.strokeWeight(0.5);
+  let spacing = 40;
+  for (let x = 0; x < buffer.width; x += spacing) buffer.line(x, 0, x, buffer.height);
+  for (let y = 0; y < buffer.height; y += spacing) buffer.line(0, y, buffer.width, y);
+
+  // Radial vignette
+  let cx = buffer.width / 2, cy = buffer.height / 2;
+  let maxR = sqrt(cx*cx + cy*cy);
+  for (let r = maxR; r > 0; r -= 5) {
+    let a = map(r, 0, maxR, 0, 40);
+    buffer.noFill();
+    buffer.stroke(PALETTE.bg[0], PALETTE.bg[1], PALETTE.bg[2], a * 0.2);
+    buffer.strokeWeight(r * 0.05); // Variable weight for softer vignette
+    buffer.ellipse(cx, cy, r * 2, r * 2);
+  }
+}
+
+// ============================================================
+// BLOOM EFFECT
+// ============================================================
+function _applyBloom() {
+  if (frameCount % 2 === 0) { // Update bloom every other frame for performance
+    // 1. Copy main canvas (or part of it) to bloomBuffer, downsampled
+    bloomBuffer.clear();
+    bloomBuffer.image(get(), 0, 0, canvasW / 4, canvasH / 4);
+
+    // 2. Blur the bloomBuffer
+    bloomBuffer.filter(BLUR, CONFIG.bloomBlur);
+  }
+
+  // 3. Composite: main canvas + additive bloom
+  push();
+  blendMode(ADD);
+  tint(255, CONFIG.bloomIntensity); // Control bloom intensity
+  image(bloomBuffer, 0, 0, canvasW, canvasH); // Upscale back to full size
+  noTint();
+  blendMode(BLEND); // ALWAYS reset blend mode
+  pop();
+}
+
+
+// ============================================================
+// TITLE
+// ============================================================
+function _drawTitle() {
+  push();
+  fill(PALETTE.accent[0], PALETTE.accent[1], PALETTE.accent[2], 240);
+  noStroke();
+  textSize(22);
+  textAlign(LEFT, TOP);
+  textFont('Inter');
+  textStyle(BOLD);
+  text('Knative Fluss Broker', 30, 30);
+
+  fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 200);
+  textSize(14);
+  textFont('Inter');
+  textStyle(NORMAL);
+  text('Data Flow Dashboard — Live Architecture View', 30, 60);
+
+  // Connection status
+  let cx = 30 + textWidth('Knative Fluss Broker') + 20;
+  if (liveMetrics) {
+    let pulseAlpha = map(sin(t * 5), -1, 1, 150, 255);
+    fill(34, 197, 94, pulseAlpha); // Green
+    noStroke();
+    ellipse(cx, 40, 10, 10);
+    fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 180);
+    textSize(11);
+    textFont('Fira Code');
+    text('LIVE — ' + (liveMetrics.containers?.running || '?') + ' containers', cx + 15, 34);
+  } else {
+    let pulseAlpha = map(sin(t * 3), -1, 1, 120, 220);
+    fill(251, 191, 36, pulseAlpha); // Amber
+    noStroke();
+    ellipse(cx, 40, 10, 10);
+    fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 180);
+    textSize(11);
+    textFont('Fira Code');
+    text('SIMULATION — metrics server offline', cx + 15, 34);
+  }
+
+  // Timestamp
+  let ts = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  textAlign(RIGHT, TOP);
+  fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 150);
+  textSize(11);
+  textFont('Fira Code');
+  text(ts + ' UTC', canvasW - 30, 80);
+
+  pop();
+}
+
+// ============================================================
+// LEGEND
+// ============================================================
+function _drawLegend() {
+  push();
+  let lx = canvasW - 30;
+  let ly = canvasH - 240;
+  textAlign(RIGHT, TOP);
+  textSize(12);
+  textFont('Inter');
+  textStyle(NORMAL);
+
+  let items = [
+    { label: 'Ingest flow', color: PALETTE.source },
+    { label: 'Schema lookup', color: PALETTE.schema },
+    { label: 'Write path', color: PALETTE.fluss },
+    { label: 'Dispatch', color: PALETTE.dispatcher },
+    { label: 'Subscriber push', color: PALETTE.subscriber },
+    { label: 'DLQ (failed)', color: PALETTE.dlq },
+    { label: 'Tiering → Iceberg', color: PALETTE.tiering },
+  ];
+
+  fill(PALETTE.bg[0], PALETTE.bg[1], PALETTE.bg[2], 220);
+  stroke(PALETTE.grid[0], PALETTE.grid[1], PALETTE.grid[2], 80);
+  strokeWeight(1);
+  rectMode(CORNER);
+  rect(lx - 200, ly - 15, 210, items.length * 24 + 30, 8); // Larger, rounded rect
+
+  fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 200);
+  textSize(11);
+  textStyle(BOLD);
+  text('DATA FLOWS', lx - 10, ly);
+  ly += 20;
+
+  for (let item of items) {
+    fill(item.color[0], item.color[1], item.color[2], 220);
+    noStroke();
+    ellipse(lx - 180, ly + 8, 10, 10); // Larger dots
+    fill(PALETTE.text[0], PALETTE.text[1], PALETTE.text[2], 200);
+    textAlign(LEFT, TOP);
+    textStyle(NORMAL);
+    text(item.label, lx - 165, ly + 3);
+    ly += 24;
+  }
+
+  pop();
+}
+
+// ============================================================
+// HINTS
+// ============================================================
+function _drawHints() {
+  push();
+  fill(PALETTE.textDim[0], PALETTE.textDim[1], PALETTE.textDim[2], 120);
+  noStroke();
+  textSize(11);
+  textAlign(LEFT, BOTTOM);
+  textFont('Fira Code');
+  text('SPACE: pause  |  S: save PNG  |  Click node: details', 30, canvasH - 20);
+  pop();
+}
+
+// ============================================================
+// TOOLTIP
+// ============================================================
+function _updateTooltip() {
+  let tooltip = document.getElementById('tooltip');
+  let node = hoveredNode || selectedNode;
+  if (node) {
+    let html = `<h3>${node.label}</h3>`;
+    html += `<div class="desc">${node.desc.replace(/\n/g, '<br>')}</div><br>`;
+    html += '<div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:10px;">';
+    for (let [k, v] of Object.entries(node.metrics)) {
+      html += `<div><span class="desc">${k}:</span> <span class="metric">${v}</span></div>`;
+    }
+    html += '</div>';
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    
+    // Position tooltip above and centered on the mouse
+    let tx = mouseX;
+    let ty = mouseY;
+
+    // Adjust for tooltip size and screen edges
+    const tooltipRect = tooltip.getBoundingClientRect();
+    let finalX = tx - tooltipRect.width / 2;
+    let finalY = ty - tooltipRect.height - 20; // 20px above cursor
+
+    if (finalX < 10) finalX = 10;
+    if (finalX + tooltipRect.width > canvasW - 10) finalX = canvasW - tooltipRect.width - 10;
+    if (finalY < 10) finalY = ty + 20; // If too high, show below cursor
+
+    tooltip.style.left = finalX + 'px';
+    tooltip.style.top = finalY + 'px';
+    
+  } else {
+    tooltip.style.display = 'none';
+  }
+}
+
+// ============================================================
+// INTERACTION
+// ============================================================
+function mousePressed() {
+  for (let id in nodes) {
+    if (nodes[id].contains(mouseX, mouseY)) {
+      selectedNode = (selectedNode === nodes[id]) ? null : nodes[id];
+      return;
+    }
+  }
+  selectedNode = null;
+}
+
+function keyPressed() {
+  if (key === ' ' || key === 'Spacebar') {
+    CONFIG.paused = !CONFIG.paused;
+    if (CONFIG.paused) noLoop(); else loop();
+  }
+  if (key === 's' || key === 'S') saveCanvas('fluss-dataflow-dashboard', 'png');
+}
+
+function windowResized() {
+  canvasW = windowWidth;
+  canvasH = windowHeight;
+  resizeCanvas(canvasW, canvasH);
+
+  trailBuffer = createGraphics(canvasW, canvasH);
+  trailBuffer.colorMode(RGB, 255, 255, 255, 255);
+
+  bloomBuffer = createGraphics(canvasW, canvasH);
+  bloomBuffer.colorMode(RGB, 255, 255, 255, 255);
+
+  backgroundBuffer = createGraphics(canvasW, canvasH);
+  backgroundBuffer.colorMode(RGB, 255, 255, 255, 255);
+  _drawStaticBackground(backgroundBuffer);
+
+  for (let id in nodes) {
+    let layout = NODE_LAYOUT[id];
+    nodes[id].setPosition(layout.x, layout.y);
+  }
+  for (let f of flows) {
+    f.init();
+  }
+}
+
+// ============================================================
+// AUTO CAPTURE (for headless screenshot)
+// ============================================================
+function autoCapture() {
+  // After 3 seconds, grab the main canvas and inject as a visible <img>
+  setTimeout(() => {
+    const mainCanvas = document.querySelectorAll('canvas')[0];
+    if (mainCanvas) {
+      const img = document.createElement('img');
+      img.src = mainCanvas.toDataURL('image/png');
+      img.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;object-fit:contain;background:#0a0e17;';
+      img.id = 'auto-capture';
+      document.body.appendChild(img);
+      // Hide canvas and UI
+      mainCanvas.style.display = 'none';
+      if (window._p5instance) noLoop();
+    }
+  }, 3000);
+}
+// Only auto-capture if URL has ?capture
+if (window.location.search.includes('capture')) autoCapture();
+
+// ============================================================
+// UI TOGGLE
+// ============================================================
+function toggleLayer(layer) {
+  CONFIG.layers[layer] = !CONFIG.layers[layer];
+  let btn = document.getElementById('btn-' + layer);
+  btn.classList.toggle('active', CONFIG.layers[layer]);
+}
+</script>
+</body>
+</html>

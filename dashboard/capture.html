@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture</title></head>
+<body style="margin:0;background:#000">
+<iframe id="frame" src="data-flow-dashboard.html" style="width:1920px;height:1080px;border:none;position:absolute;top:0;left:0;"></iframe>
+<script>
+setTimeout(() => {
+  try {
+    const canvas = document.getElementById('frame').contentDocument.querySelector('canvas');
+    const img = document.createElement('img');
+    img.src = canvas.toDataURL('image/png');
+    img.style.width = '100%';
+    img.id = 'capture';
+    document.body.innerHTML = '';
+    document.body.appendChild(img);
+    window._captureDone = true;
+  } catch(e) {
+    document.body.innerHTML = '<h1>Error: ' + e.message + '</h1>';
+    window._captureDone = true;
+  }
+}, 4000);
+</script>
+</body>
+</html>

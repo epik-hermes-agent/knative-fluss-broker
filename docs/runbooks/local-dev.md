@@ -12,17 +12,21 @@
 # Clone and enter repo
 cd knative-fluss-broker
 
-# Start infrastructure (Fluss + ZooKeeper)
-docker compose up -d
+# Start infrastructure (Fluss + ZooKeeper + LocalStack)
+docker compose -f docker/docker-compose.yml up -d zookeeper fluss-coordinator fluss-tablet
 
-# Run unit tests
-make test
+# Run unit tests (no Docker needed)
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test :data-plane:common:test :data-plane:ingress:test :data-plane:dispatcher:test :data-plane:storage-fluss:test :data-plane:schema:test :data-plane:delivery:test :control-plane:controller:test :tools:tui:test
 
-# Run integration tests (Docker required)
-make test-integration
+# Run all tests (Docker required for integration + e2e)
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test
 
-# Run all tests
-make build
+# Run integration tests only
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test :test:integration:test
+
+# Run ingress server locally
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 FLUSS_HOST=127.0.0.1 FLUSS_PORT=9123 SERVER_PORT=8080 \
+  ./gradlew :data-plane:ingress:run
 ```
 
 ## Full Lakehouse Stack
@@ -37,6 +41,31 @@ make test test-integration test-e2e
 # Access Flink UI: http://localhost:8081
 # Access LocalStack S3: http://localhost:4566
 # Access Polaris: http://localhost:8181
+# Access SQL Gateway: http://localhost:8083
+```
+
+## Live Dashboard
+
+After starting the lakehouse stack:
+
+```bash
+make dashboard
+```
+
+The TUI connects to:
+- **Flink SQL Gateway** at `localhost:8083` for data queries
+- **Fluss Coordinator** at `localhost:9123` for metadata
+
+Requirements: A real terminal (PTY). Won't work in IDE embedded consoles.
+
+Navigation: `q` quit, `r` refresh, `j/k` navigate rows, `1-5` switch tabs, `TAB` next tab.
+
+### Manual Observation (without TUI)
+
+```bash
+make watch            # Poll events via docker exec
+make watch-once       # Show last 20 events
+make health-full      # Check all services including lakehouse
 ```
 
 ## K8s E2E (Kind + Knative + Fluss)

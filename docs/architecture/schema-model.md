@@ -17,8 +17,9 @@ Every event stored in the broker uses a fixed envelope schema. This schema defin
 
 ```
 Table: knative_{namespace}.broker_{brokerName}
-Storage: Fluss Log Table
-Partitioning: RANGE(ingestion_date)
+Storage: Fluss Log Table (append-only, no primary key)
+Distribution: HASH(event_id) with 4 buckets
+Datalake: enabled (Iceberg tiering)
 
 Column Name         | Type                   | Nullable | Description
 --------------------|------------------------|----------|-------------------------------------------
@@ -32,11 +33,7 @@ schema_id           | INT                    | YES      | Schema identifier from
 schema_version      | INT                    | YES      | Schema version number
 attributes          | MAP<STRING, STRING>    | YES      | CloudEvent extension attributes
 ingestion_time      | TIMESTAMP(3)           | NO       | Server-side ingestion timestamp
-ingestion_date      | DATE                   | NO       | Partition key (derived from ingestion_time)
-
-Primary Key: event_id
-Sort Key: ingestion_time (ascending)
-Partition Key: ingestion_date
+ingestion_date      | DATE                   | NO       | Date derived from ingestion_time
 ```
 
 ### Envelope Design Decisions

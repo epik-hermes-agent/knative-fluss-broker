@@ -85,7 +85,7 @@ public final class EnvelopeRowMapper {
         // 8: attributes (nullable — empty map becomes null for Fluss MAP type)
         row.setField(COL_ATTRIBUTES, toFlussMap(envelope.attributes()));
         // 9: ingestion_time
-        row.setField(COL_INGESTION_TIME, toTimestampLtz(envelope.ingestionTime()));
+        row.setField(COL_INGESTION_TIME, toTimestampNtz(envelope.ingestionTime()));
         // 10: ingestion_date
         row.setField(COL_INGESTION_DATE, toIntDate(envelope.ingestionDate()));
 
@@ -111,7 +111,7 @@ public final class EnvelopeRowMapper {
                 .schemaId(row.isNullAt(COL_SCHEMA_ID) ? null : row.getInt(COL_SCHEMA_ID))
                 .schemaVersion(row.isNullAt(COL_SCHEMA_VERSION) ? null : row.getInt(COL_SCHEMA_VERSION))
                 .attributes(fromFlussMap(row, COL_ATTRIBUTES))
-                .ingestionTime(fromTimestampLtz(row.getTimestampLtz(COL_INGESTION_TIME, 3)))
+                .ingestionTime(fromTimestampNtz(row.getTimestampNtz(COL_INGESTION_TIME, 3)))
                 .ingestionDate(fromIntDate(row.getInt(COL_INGESTION_DATE)))
                 .build();
     }
@@ -144,7 +144,7 @@ public final class EnvelopeRowMapper {
             builder.attributes(fromInternalMap(row.getMap(COL_ATTRIBUTES)));
         }
 
-        builder.ingestionTime(fromTimestampLtz(row.getTimestampLtz(COL_INGESTION_TIME, 3)));
+        builder.ingestionTime(fromTimestampNtz(row.getTimestampNtz(COL_INGESTION_TIME, 3)));
         builder.ingestionDate(fromIntDate(row.getInt(COL_INGESTION_DATE)));
 
         return builder.build();

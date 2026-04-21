@@ -67,10 +67,7 @@ ce-id: abc-123  (binary)
    - Async acknowledgment (ack on Fluss write confirmation)
    |
 7. Return 202 Accepted with:
-   - event_id
-   - ingestion_time
-   - schema_id
-   - schema_version
+   - `{"accepted":true,"eventId":"<event_id>"}`
 ```
 
 ### Write Path Configuration

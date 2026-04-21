@@ -20,18 +20,17 @@ A Knative-native event broker backed by Apache Fluss for durable, low-latency ev
 ## Build Commands
 
 ```bash
-./gradlew build                      # Full build
-./gradlew build -x integrationTest   # Skip integration tests
-./gradlew :data-plane:common:build   # Build single module
-./gradlew test                       # Unit tests only
-./gradlew integrationTest            # Integration tests (Docker required)
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew build                      # Full build
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :data-plane:common:build   # Build single module
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test                       # Unit tests only (excl. integration/e2e)
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test :test:integration:test  # Integration tests (Docker required)
 ```
 
 ## Project Layout
 
 ```
 data-plane/common/       # Envelope model, config, metrics, CloudEvents utils
-data-plane/ingress/      # HTTP ingress handler
+data-plane/ingress/      # HTTP ingress server (CloudEvents binary + structured)
 data-plane/dispatcher/   # Per-trigger dispatcher with backpressure
 data-plane/storage-fluss/# Fluss client and table management
 data-plane/schema/       # Schema registry and validation
@@ -45,6 +44,7 @@ test/wiremock/           # WireMock scenarios
 test/integration/        # Integration tests
 test/e2e/                # End-to-end tests
 test/performance-smoke/  # Performance benchmarks
+tools/tui/               # Live TUI dashboard (TamboUI)
 ```
 
 ## Code Standards

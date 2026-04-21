@@ -11,7 +11,7 @@
 - Retry queue scheduling
 - Config objects
 
-**Run:** `make test` or `./gradlew test`
+**Run:** `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test :data-plane:common:test :data-plane:ingress:test :data-plane:dispatcher:test :data-plane:storage-fluss:test :data-plane:schema:test :data-plane:delivery:test :control-plane:controller:test :tools:tui:test`
 
 ### Layer 2: Integration Tests (Docker required)
 - Ingress → Fluss persistence
@@ -21,7 +21,7 @@
 - Schema registry operations
 - Backpressure lane pause/resume
 
-**Run:** `make test-integration` or `./gradlew integrationTest`
+**Run:** `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test :test:integration:test`
 
 ### Layer 3: E2E Tests — Data Plane (docker-compose Fluss)
 - Producer → Ingress → Fluss → Dispatcher → Subscriber

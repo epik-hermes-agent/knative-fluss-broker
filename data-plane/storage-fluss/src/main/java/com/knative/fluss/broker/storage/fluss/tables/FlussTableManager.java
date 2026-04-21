@@ -298,7 +298,7 @@ public class FlussTableManager {
                 .column("schema_id", DataTypes.INT())
                 .column("schema_version", DataTypes.INT())
                 .column("attributes", DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()))
-                .column("ingestion_time", DataTypes.TIMESTAMP_LTZ(3))
+                .column("ingestion_time", DataTypes.TIMESTAMP(3))
                 .column("ingestion_date", DataTypes.DATE())
                 // NO primary key — this is a Log Table (append-only)
                 .build();
@@ -315,7 +315,7 @@ public class FlussTableManager {
                 .column("schema_id", DataTypes.INT())
                 .column("schema_version", DataTypes.INT())
                 .column("attributes", DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()))
-                .column("ingestion_time", DataTypes.TIMESTAMP_LTZ(3))
+                .column("ingestion_time", DataTypes.TIMESTAMP(3))
                 .column("ingestion_date", DataTypes.DATE())
                 .column("dlq_reason", DataTypes.STRING())
                 .column("dlq_attempts", DataTypes.INT())

@@ -125,6 +125,7 @@ if [ "$LAKEHOUSE" = true ]; then
     check_docker_container "Polaris REST Catalog" "polaris"
     check_docker_container "Flink JobManager" "fluss-flink-jobmanager"
     check_docker_container "Flink TaskManager" "fluss-flink-taskmanager"
+    check_docker_container "Flink SQL Gateway" "fluss-flink-sql-gateway"
 fi
 
 # ── Port checks ─────────────────────────────────
@@ -140,6 +141,8 @@ check_service "LocalStack" "localhost" "4566" \
 if [ "$LAKEHOUSE" = true ]; then
     check_service "Polaris" "localhost" "8181"
     check_service "Flink UI" "localhost" "8081"
+    check_service "SQL Gateway" "localhost" "8083" \
+        "curl -sf http://localhost:8083/v1/info | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get(\"version\",\"\"))' 2>/dev/null"
 fi
 
 # ── LocalStack bucket check ─────────────────────

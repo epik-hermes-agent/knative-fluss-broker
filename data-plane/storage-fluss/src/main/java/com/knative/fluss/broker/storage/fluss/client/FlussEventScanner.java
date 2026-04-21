@@ -31,7 +31,7 @@ public class FlussEventScanner implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(FlussEventScanner.class);
 
     /** Default poll timeout when scanning for new records. */
-    private static final Duration DEFAULT_POLL_TIMEOUT = Duration.ofMillis(200);
+    private static final Duration DEFAULT_POLL_TIMEOUT = Duration.ofSeconds(2);
 
     private final FlussConnectionManager connectionManager;
     private final Map<String, LogScanner> scanners = new ConcurrentHashMap<>();
@@ -60,6 +60,12 @@ public class FlussEventScanner implements AutoCloseable {
 
             // Poll for records with a short timeout
             var scanRecords = scanner.poll(DEFAULT_POLL_TIMEOUT);
+
+            if (!scanRecords.isEmpty()) {
+                log.info("Polled {} raw records from {} for trigger {}",
+                        scanRecords.count(), tablePath.fullPath(), triggerKey);
+            }
+
             List<Envelope> envelopes = new ArrayList<>();
 
             for (ScanRecord record : scanRecords) {

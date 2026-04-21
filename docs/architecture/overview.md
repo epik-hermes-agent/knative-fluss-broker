@@ -67,14 +67,20 @@ Responsibilities:
 
 ### Ingress Handler (Data Plane - Ingress)
 
-HTTP endpoint that accepts incoming CloudEvents from event sources.
+HTTP server (`IngressServer`, backed by `com.sun.net.httpserver.HttpServer`) that accepts incoming CloudEvents from event sources. The entry point is `IngressServerMain`, which reads config from env vars (`FLUSS_HOST`, `FLUSS_PORT`, `SERVER_PORT`).
+
+**HTTP Endpoint:** `POST /{namespace}/{broker}`
+
+**Content Modes:** Both binary (ce-* headers + body) and structured (`application/cloudevents+json`) are supported via `CloudEventFromHttp.parse()`.
 
 Pipeline:
-1. Validate CloudEvent format (required attributes: id, source, type, specversion)
-2. Resolve or register schema (if schema registry is enabled)
-3. Build the event envelope row with metadata columns
-4. Write to the Fluss log table
-5. Return 202 Accepted with delivery confirmation
+1. Receive HTTP request on `/{namespace}/{broker}`
+2. Parse CloudEvent via `CloudEventFromHttp.parse()` (auto-detects binary vs structured mode)
+3. Validate CloudEvent spec (required attributes: id, source, type, specversion=1.0)
+4. Resolve or register schema (if schema registry is enabled)
+5. Build the event envelope row with metadata columns
+6. Write to the Fluss log table via `FlussEventWriter`
+7. Return `202 Accepted` with `{"accepted":true,"eventId":"..."}`
 
 ### Fluss Log Table (Data Plane - Storage)
 
@@ -84,18 +90,19 @@ Table structure:
 ```
 fluss database: knative_{namespace}
 fluss table:    broker_{brokerName}
-  partitioning: by date (ingestion_date)
+  type:          Log Table (append-only, no primary key)
+  distribution:  HASH(event_id), 4 buckets
   columns:
-    - event_id         (STRING, PK)
+    - event_id         (STRING)
     - event_source     (STRING)
     - event_type       (STRING)
-    - event_time       (TIMESTAMP)
+    - event_time       (TIMESTAMP(3))
     - content_type     (STRING)
     - data             (BYTES)
     - schema_id        (INT)
     - schema_version   (INT)
     - attributes       (MAP<STRING, STRING>)
-    - ingestion_time   (TIMESTAMP)
+    - ingestion_time   (TIMESTAMP(3))
     - ingestion_date   (DATE)
 ```
 

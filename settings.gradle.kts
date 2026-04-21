@@ -20,3 +20,6 @@ include(":test:wiremock")
 include(":test:integration")
 include(":test:e2e")
 include(":test:performance-smoke")
+
+// Tools
+include(":tools:tui")
